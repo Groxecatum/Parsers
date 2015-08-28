@@ -101,15 +101,15 @@ def ParseItem(text):
     #print text   
     Descs = re.findall(DescHTML1, text, re.DOTALL);
     for Desc in Descs:   
-      desc_str += striphtml(Desc, True);  
+        desc_str += striphtml(Desc, True);  
     Descs = re.findall(DescHTML2, text, re.DOTALL);
     for Desc in Descs:
-      desc_str += striphtml(Desc, True);  
+        desc_str += striphtml(Desc, True);  
     Descs = re.findall(DescHTML3, text, re.DOTALL);
     for Desc in Descs:   
-     # print Desc
-      desc_str += striphtml(Desc, True);
-   # print desc_str
+    # print Desc
+        desc_str += striphtml(Desc, True);
+    # print desc_str
     # Конвертим в юникод
     name_str = name_str.decode('utf8', errors='ignore').encode('windows-1251', errors='ignore');
     desc_str = desc_str.decode('utf8', errors='ignore').encode('windows-1251', errors='ignore');
