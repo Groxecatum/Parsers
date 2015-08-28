@@ -60,7 +60,7 @@ def savepic(url):
     resource = urllib.urlopen(url);
     urlparts = url.split('/');
     imagename = "viva_images\{0}".format(urlparts[-1]);
-    if not os.path.isfile(imagename):
+    if not os.path.exists(imagename):
         out = open(imagename, 'wb');
         out.write(resource.read());
         out.close(); 
@@ -142,7 +142,8 @@ try:
         page_text = page.read();
         print 'Parsing Item: ' + CurrentItem;
         ParseItem(page_text);
-                
+
+    f.close();                
 except:
     f.close();
     raise
