@@ -47,7 +47,7 @@ def savepic(img, folderPath):
     else:
         print imagename + ' passed';
 
-def IsItemsChached():
+def IsItemsCached():
     return os.path.exists(CACHEFile);
 
 def CacheItems():
@@ -90,7 +90,7 @@ def CacheItems():
 f = open(CSVFile, 'w');
 try:
     f.write('{0};{1};{2};{3};{4}\n'.format('sku', 'name', 'desc', 'img', 'group'));
-    if not IsItemsChached():
+    if not IsItemsCached():
         CacheItems();                  
     items_cache = open(CACHEFile, 'r');
     try:
