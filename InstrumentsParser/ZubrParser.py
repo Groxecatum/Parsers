@@ -16,18 +16,46 @@ imagesDir = 'instrument_images';
 CSVFile = 'instrument_parse-results.csv';
 CACHEFile = 'itemlinks.txt';
 
-#-------------------------------------------------------------------
+#-------------------------------------------------------------------   
 
-def ParseSKU(root, tree):
+def ParseSKU_DESC(desc_div, tree):
+    # если артикул один - называем как есть
+    # если артикулов несколько - уточняем название товара в скобках
     pass;
+
 def ParseName(root, tree):
-    pass;
-def ParseDesc(root, tree):
-    pass;
+    Res = '';
+    box = root.get_element_by_id('content-box');
+    name_box = box.find_class('left').pop();
+    for child in name_box.getchildren():
+        Res += ' ' + child.text_content();
+    return Res; 
+
+def ParseDescDiv_spec(root, tree):
+    return root.get_element_by_id('specifications');
+
+def ParseDescDiv_features(root, tree):
+    return root.get_element_by_id('features');
+
+def ParseDesc(desc_div_spec, desc_div_features, tree):
+    return tree.tostring(desc_div_spec.drop_tag()) + tree.tostring(desc_div_features.drop_tag());
+
 def ParseImages(root, tree):
-    pass;
+    res = [];
+    images = root.find_class('gallery__image');
+    for image in images:
+        for elem in image.getchildren():
+            if elem.tag == 'a':
+                res.append(elem.get('href'));
+                
+    return res;
+
 def ParseCategory(root, tree):
-    pass;
+    box = root.get_element_by_id('content-box');
+    way = box.find_class('way').pop();
+    way = way.text_content();
+    way = way.replace('/', '|');
+    return way;
 
 def savepic(img, folderPath):
     PathParts = folderPath.split('/');
@@ -89,7 +117,7 @@ def CacheItems():
 
 f = open(CSVFile, 'w');
 try:
-    f.write('{0};{1};{2};{3};{4}\n'.format('sku', 'name', 'desc', 'img', 'group'));
+    f.write('{0};{1};{2};{3};{4}\n'.format('sku', 'name', 'desc', 'group', 'img', 'adImg1', 'adImg2', 'adImg3'));
     if not IsItemsCached():
         CacheItems();                  
     items_cache = open(CACHEFile, 'r');
@@ -98,13 +126,30 @@ try:
             page = urlopen(site_url + itemLink);
             tree = html.parse(page);
             root = tree.getroot();
-            sku_str = ParseSKU(root, tree);
+            
             name_str = ParseName(root, tree);
-            desc_str = ParseDesc(root, tree);
+            print 'Name:' + name_str;
             group_str = ParseCategory(root, tree);
+            print 'Category:' + group_str;
             img_str = ParseImages(root, tree);
-            savepic(img_str, group_str);
-            f.write('{0};{1};{2};{3};{4}\n'.format(sku_str, name_str, desc_str, img_str, group_str));
+            print 'Images:' + img_str;
+            if not (img_str != ''):
+                savepic(img_str, group_str);
+                
+            desc_div_features = ParseDescDiv_features(root, tree);    
+            desc_div_spec = ParseDescDiv_spec(root, tree);
+            
+            # основная операция
+            SKUs_NameDesc_dict = ParseSKU_DESC(desc_div_spec, tree);
+            
+            desc_str = ParseDesc(desc_div_features, desc_div_spec, tree);
+            
+            for sku_str, name_additional  in SKUs_NameDesc_dict:
+                f.write('{0};{1};{2};{3};{4}\n'.format(sku_str, 
+                                                       '{0}({1})'.format(name_str, name_additional), 
+                                                       desc_str,
+                                                       group_str, 
+                                                       img_str));
             print itemLink.strip();
         items_cache.close();  
     except:
