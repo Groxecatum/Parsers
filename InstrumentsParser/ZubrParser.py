@@ -6,6 +6,7 @@ Created on 28.08.2015.
 @author: YSklyarov
 '''
 import os;
+import re;
 from urllib2 import urlopen;
 import lxml.html as html;
 
@@ -18,18 +19,21 @@ CACHEFile = 'itemlinks.txt';
 
 #-------------------------------------------------------------------   
 
+def PrettifyCategoryStr(Str):
+    Str = re.sub("\s+|\n|\r", '', Str);
+    return Str;
+
 def ParseSKU_DESC(desc_div, tree):
     # если артикул один - называем как есть
     # если артикулов несколько - уточняем название товара в скобках
     pass;
 
 def ParseName(root, tree):
-    Res = '';
     box = root.get_element_by_id('content-box');
-    name_box = box.find_class('left').pop();
-    for child in name_box.getchildren():
-        Res += ' ' + child.text_content();
-    return Res; 
+    way = box.find_class('way').pop();
+    way = way.text_content();
+    name = way.split('/');
+    return name[-1].strip();
 
 def ParseDescDiv_spec(root, tree):
     return root.get_element_by_id('specifications');
@@ -54,7 +58,14 @@ def ParseCategory(root, tree):
     box = root.get_element_by_id('content-box');
     way = box.find_class('way').pop();
     way = way.text_content();
-    way = way.replace('/', '|');
+    wayParts = way.split('/');
+    way = '';
+    for wayPart in wayParts:
+        if wayPart != wayParts[-1]:
+            wayPart.strip(); 
+            way += PrettifyCategoryStr(wayPart).strip();
+            if wayPart != wayParts[-2]:
+                way += '|';
     return way;
 
 def savepic(img, folderPath):
@@ -129,7 +140,7 @@ try:
             
             name_str = ParseName(root, tree);
             print 'Name:' + name_str;
-            group_str = ParseCategory(root, tree);
+            group_str = PrettifyCategoryStr(ParseCategory(root, tree));
             print 'Category:' + group_str;
             img_str = ParseImages(root, tree);
             print 'Images:' + img_str;
