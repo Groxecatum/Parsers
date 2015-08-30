@@ -9,7 +9,7 @@ import os;
 import re;
 from urllib2 import urlopen;
 import lxml.html as html;
-import lxml.etree as etree;
+from lxml.html.builder import TABLE
 
 #-----------------------------------------------------------------
 
@@ -24,9 +24,48 @@ def PrettifyCategoryStr(Str):
     Str = re.sub("\s+|\n|\r", '', Str);
     return Str;
 
+def tabletoList(tableElem):
+    table = [];
+    for tbody in tableElem.getchildren():
+        for row in tbody.getchildren():
+            tableRow = [];
+            for col in row.getchildren():
+                tableRow.append(col.text_content().strip());
+            table.append(tableRow);
+    return table;            
+
+def IsSKU(): #строка содержит 5+ цифр(подряд?) 
+    pass;
+  
+def getNameStrFromVertical(table): # Один артикул - обходим всю таблицу
+    pass;
+
+def getNameStrFromHorizontal(row): # обходим только один ряд. кроме первого столбца - артикула
+    pass;           
+
 def ParseSKU_DESC(desc_div, tree):
-    # если артикул один - называем как есть
-    # если артикулов несколько - уточняем название товара в скобках
+    Result = {};
+    for child in desc_div.getchildren():
+        if child.tag == 'table':
+            table = tabletoList(child);
+            # если артикулов несколько - уточняем название товара в скобках
+            if (table[0][0] == 'Артикул'):
+                # если артикул один - называем как есть
+                # таблица построена вертикально 
+                if IsSKU(table[0][1]):    
+                    Result[table[0][1]] = getNameStrFromVertical();  
+                else:
+                    for row in table:
+                        first = True;
+                        for col in row.getchildren():
+                            if not first:    
+                                cols_str += col.text_content();
+                            first = False;
+                        Result[row[0]] = '({0})'.format(cols_str);  
+            
+            
+   
+    desc_div.xpath();
     pass;
 
 def ParseName(root, tree):
