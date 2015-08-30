@@ -164,12 +164,12 @@ try:
             
             desc_str = ParseDesc(desc_div_spec, desc_div_features, tree);
             #print desc_str;
-            '''for sku_str, name_additional  in SKUs_NameDesc_dict:
+            for sku_str, name_additional  in SKUs_NameDesc_dict:
                 f.write(formatStr.format(sku_str, 
                                         '{0}({1})'.format(name_str, name_additional), 
                                         desc_str,
                                         group_str, 
-                                        img_str));'''
+                                        img_str));
             #print itemLink.strip();
         items_cache.close();  
     except:
