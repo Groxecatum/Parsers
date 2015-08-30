@@ -9,7 +9,6 @@ import os;
 import re;
 from urllib2 import urlopen;
 import lxml.html as html;
-from lxml.html.builder import TABLE
 
 #-----------------------------------------------------------------
 
