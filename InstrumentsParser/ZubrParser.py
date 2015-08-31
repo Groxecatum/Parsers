@@ -24,48 +24,58 @@ def PrettifyCategoryStr(Str):
     return Str;
 
 def tabletoList(tableElem):
-    table = [];
+    tableArray = [];
     for tbody in tableElem.getchildren():
         for row in tbody.getchildren():
             tableRow = [];
             for col in row.getchildren():
                 tableRow.append(col.text_content().strip());
-            table.append(tableRow);
-    return table;            
+            tableArray.append(tableRow);
+    return tableArray;            
 
-def IsSKU(): #строка содержит 5+ цифр(подряд?) 
-    pass;
-  
-def getNameStrFromVertical(table): # Один артикул - обходим всю таблицу
-    pass;
+def IsSKU(str): #строка содержит 5+ цифр(подряд?) 
+    return re.search('\d', str) != None;
+        
+def getNameStrFromVertical(tableArray): # Один артикул - обходим всю таблицу Кроме первого элемента
+    ResList = [];
+    for row in tableArray:
+        if row.index() != 1:
+            for col in row:
+                pass;
+            # если это последняя колонка(со значениями)
+            ResList.append(col);
+    return ','.join(ResList);
 
 def getNameStrFromHorizontal(row): # обходим только один ряд. кроме первого столбца - артикула
-    pass;           
+    #first = True;
+    ColsList = [];
+    for idx, col in enumerate(row):
+        if idx:    # Не значение артикула
+            ColsList.append(col);
+        #first = False; 
+    return ','.join(ColsList);         
 
 def ParseSKU_DESC(desc_div, tree):
     Result = {};
     for child in desc_div.getchildren():
         if child.tag == 'table':
-            table = tabletoList(child);
+            tableArray = tabletoList(child);
             # если артикулов несколько - уточняем название товара в скобках
-            if (table[0][0] == 'Артикул'):
+            if (tableArray[0][0] == u'Артикул'):
                 # если артикул один - называем как есть
                 # таблица построена вертикально 
-                if IsSKU(table[0][1]):    
-                    Result[table[0][1]] = getNameStrFromVertical();  
-                else:
-                    for row in table:
-                        first = True;
-                        for col in row.getchildren():
-                            if not first:    
-                                cols_str += col.text_content();
-                            first = False;
-                        Result[row[0]] = '({0})'.format(cols_str);  
+                if IsSKU(tableArray[0][1]):                              # Если элемент справа - артикул - забираем его
+                    Result[tableArray[0][1]] = getNameStrFromVertical(tableArray); # и крепим к нему все свойства   
+                else:  
+                    for idx, row in enumerate(tableArray):
+                        if idx:    #Не шапка
+                            cols_str = getNameStrFromHorizontal(row);
+                            Result[row[0]] = '(' + cols_str + ')';  
             
             
    
-    desc_div.xpath();
-    pass;
+    #desc_div.xpath();
+    return Result;
 
 def ParseName(root, tree):
     box = root.get_element_by_id('content-box');
@@ -99,17 +109,18 @@ def ParseImages(root, tree):
     resStr = ';'.join(res); 
     return resStr;
 
-def ParseCategory(root, tree):
+def ParseCategory(root, tree, IsMultipleSKUs): # если артикулов больше одного - тогда название входит как название группы
     box = root.get_element_by_id('content-box');
     way = box.find_class('way').pop();
     way = way.text_content();
     wayParts = way.split('/');
     way = '';
     for wayPart in wayParts:
-        if wayPart != wayParts[-1]:
-            wayPart.strip(); 
+        if (wayPart != wayParts[-1]) or IsMultipleSKUs:
+            wayPart = wayPart.strip(); 
             way += PrettifyCategoryStr(wayPart).strip();
-            if wayPart != wayParts[-2]:
+            if (((not IsMultipleSKUs) and (wayPart != PrettifyCategoryStr(wayParts[-2].strip()))) or
+                (IsMultipleSKUs and (wayPart != wayParts[-1]))):
                 way += '|';
     return way;
 
@@ -187,8 +198,6 @@ try:
             
             name_str = ParseName(root, tree);
             print 'Name:' + name_str;
-            group_str = PrettifyCategoryStr(ParseCategory(root, tree));
-            print 'Category:' + group_str;
             img_str = ParseImages(root, tree);
             print 'Images:' + img_str;
             if img_str != '':
@@ -200,11 +209,13 @@ try:
             # основная операция
             SKUs_NameDesc_dict = ParseSKU_DESC(desc_div_spec, tree);
             
+            group_str = PrettifyCategoryStr(ParseCategory(root, tree, (len(SKUs_NameDesc_dict) > 1)));
+            print 'Category:' + group_str;
             desc_str = ParseDesc(desc_div_spec, desc_div_features, tree);
             #print desc_str;
-            for sku_str, name_additional  in SKUs_NameDesc_dict:
-                f.write(formatStr.format(sku_str, 
-                                        '{0}({1})'.format(name_str, name_additional), 
+            for key in SKUs_NameDesc_dict:
+                f.write(formatStr.format(key, 
+                                        '{0}({1})'.format(name_str, SKUs_NameDesc_dict[key]), 
                                         desc_str,
                                         group_str, 
                                         img_str));
