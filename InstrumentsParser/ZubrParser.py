@@ -43,7 +43,8 @@ def tabletoList(tableElem):
             tableRow = [];
             for col in row.getchildren():
                 tableRow.append(col.text_content().strip());
-            tableArray.append(tableRow);
+            if (tableRow != []):
+                tableArray.append(tableRow);
     return tableArray;            
 
 def IsSKU(Str): #строка содержит 5+ цифр(подряд?)
@@ -71,8 +72,10 @@ def getNameStrFromHorizontal(row): # обходим только один ряд
 
 def ParseSKU_DESC(desc_div, tree, sku_default):
     Result = {};
+    table_found = False;
     for child in desc_div.getchildren():
-        if child.tag == 'table':
+        if (child.tag == 'table') and (not table_found): # у некоторых товаров - 2 таблицы
+            table_found = True;
             tableArray = tabletoList(child);
             # если артикулов несколько - уточняем название товара в скобках
             if (tableArray[0][0] == u'Артикул'):
@@ -95,6 +98,7 @@ def ParseName(root, tree):
     box = root.get_element_by_id('content-box');
     way = box.find_class('way').pop();
     way = way.text_content();
+    way = way.replace(u'г/г', u'г-г');
     name = way.split('/');
     return name[-1].strip();
 
@@ -202,7 +206,7 @@ def CacheItems():
         items_cache.close();
         raise;
 
-f = open(CSVFile, 'w');
+f = open(CSVFile, 'a+');
 try:
     f.write('{0};{1};{2};{3};{4};{5};{6};{7};{8};{9};{10};{11};{12}\n'.format('sku', 'name', 'desc', 'group', 'img', 'adImg1', 'adImg2', 'adImg3', 'adImg4', 'adImg5', 'adImg6', 'adImg7', 'adImg8'));
     if not IsItemsCached():
@@ -212,15 +216,15 @@ try:
         for itemLink in items_cache.readlines():
             page = urlopen(site_url + itemLink, timeout = 5000);
             tree = html.parse(page);
-            root = tree.getroot();
-            
+            root = tree.getroot(); 
             name_str = ParseName(root, tree);
             print 'Name:' + name_str;
             img_str = ParseImages(root, tree).strip();
-            print 'Images:' + img_str;
+            print 'Images links:' + img_str;
             if img_str != '':
-                savepics(img_str, itemLink);
+                img_str = savepics(img_str, itemLink);
                 
+            print 'Images paths:' + img_str;    
             desc_div_features = ParseDescDiv_features(root, tree);    
             desc_div_spec = ParseDescDiv_spec(root, tree);
             
@@ -234,14 +238,16 @@ try:
             desc_str = ParseDesc(desc_div_spec, desc_div_features, tree);
             desc_str = DeleteLineWraps(desc_str);
             #print desc_str;
+            orig_name_str = name_str;
+            group_str = group_str.encode('windows-1251', errors='ignore');
+            desc_str = desc_str.encode('windows-1251', errors='ignore'); 
+            img_str = img_str.encode('windows-1251', errors='ignore');
             for key in SKUs_NameDesc_dict:
+                name_str = orig_name_str;
                 encodedKey = key.encode('windows-1251', errors='ignore');
                 if IsMultipleSKUs:
-                    name_str += '(' + SKUs_NameDesc_dict[key] + ')';
-                img_str = img_str.encode('windows-1251', errors='ignore');
+                    name_str = orig_name_str + '(' + SKUs_NameDesc_dict[key] + ')';
                 name_str = name_str.encode('windows-1251', errors='ignore');
-                group_str = group_str.encode('windows-1251', errors='ignore'); 
-                desc_str = desc_str.encode('windows-1251', errors='ignore');
                 f.write(formatStr.format(encodedKey, 
                                         name_str, 
                                         desc_str,
