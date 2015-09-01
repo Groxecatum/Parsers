@@ -18,9 +18,22 @@ CSVFile = 'instrument_parse-results.csv';
 CACHEFile = 'itemlinks.txt';
 formatStr = '{0};{1};{2};{3};{4}\n';
 #-------------------------------------------------------------------   
+def DeleteSpacesFromMiddle(Str):
+    Str = re.sub("\s{2}", '', Str);
+    return Str;    
 
-def PrettifyCategoryStr(Str):
-    Str = re.sub("\s+|\n|\r", '', Str);
+def MultipleStrip(Str):
+    Str = re.sub("^\s+|\s+$", '', Str);
+    return Str;
+
+def DeleteLineWraps(Str):
+    Str = re.sub("\n|\r", '', Str);
+    return Str;
+
+def PrettifyStr(Str):
+    Str = DeleteLineWraps(Str);
+    Str = MultipleStrip(Str);
+    Str = DeleteSpacesFromMiddle(Str);
     return Str;
 
 def tabletoList(tableElem):
@@ -33,13 +46,14 @@ def tabletoList(tableElem):
             tableArray.append(tableRow);
     return tableArray;            
 
-def IsSKU(str): #строка содержит 5+ цифр(подряд?) 
-    return re.search('\d', str) != None;
+def IsSKU(Str): #строка содержит 5+ цифр(подряд?)
+    Res = (re.search('\d', Str) != None) or (re.search('-', Str) != None); 
+    return Res;
         
-def getNameStrFromVertical(tableArray): # Один артикул - обходим всю таблицу Кроме первого элемента
+def getNameStrFromVertical(tableArray): # Один артикул - обходим всю таблицу Кроме первого элемента - шапка
     ResList = [];
-    for row in tableArray:
-        if row.index() != 1:
+    for idx, row in enumerate(tableArray):
+        if idx:
             for col in row:
                 pass;
             # если это последняя колонка(со значениями)
@@ -55,7 +69,7 @@ def getNameStrFromHorizontal(row): # обходим только один ряд
         #first = False; 
     return ','.join(ColsList);         
 
-def ParseSKU_DESC(desc_div, tree):
+def ParseSKU_DESC(desc_div, tree, sku_default):
     Result = {};
     for child in desc_div.getchildren():
         if child.tag == 'table':
@@ -66,15 +80,15 @@ def ParseSKU_DESC(desc_div, tree):
                 # таблица построена вертикально 
                 if IsSKU(tableArray[0][1]):                              # Если элемент справа - артикул - забираем его
                     Result[tableArray[0][1]] = getNameStrFromVertical(tableArray); # и крепим к нему все свойства   
-                else:  
-                    for idx, row in enumerate(tableArray):
-                        if idx:    #Не шапка
-                            cols_str = getNameStrFromHorizontal(row);
-                            Result[row[0]] = '(' + cols_str + ')';  
-            
-            
-   
-    #desc_div.xpath();
+                else:
+                    if IsSKU(tableArray[1][0]):   
+                        for idx, row in enumerate(tableArray):
+                            if idx:    #Не шапка
+                                cols_str = getNameStrFromHorizontal(row);
+                                Result[row[0]] = cols_str;
+                    else: # Не нашли артикул - используем имя товара
+                        Result[sku_default] = '';
+                        
     return Result;
 
 def ParseName(root, tree):
@@ -118,22 +132,24 @@ def ParseCategory(root, tree, IsMultipleSKUs): # если артикулов б�
     for wayPart in wayParts:
         if (wayPart != wayParts[-1]) or IsMultipleSKUs:
             wayPart = wayPart.strip(); 
-            way += PrettifyCategoryStr(wayPart).strip();
-            if (((not IsMultipleSKUs) and (wayPart != PrettifyCategoryStr(wayParts[-2].strip()))) or
-                (IsMultipleSKUs and (wayPart != wayParts[-1]))):
+            way += PrettifyStr(wayPart).strip();
+            if (((not IsMultipleSKUs) and (wayPart != PrettifyStr(wayParts[-2].strip()))) or
+                (IsMultipleSKUs and (wayPart != PrettifyStr(wayParts[-1].strip())))):
                 way += '|';
     return way;
 
 def savepics(imgs, itemLink):
     itemLink = itemLink.strip().replace('/', '\\');
     fullPath = r'images\zubr' + itemLink;
+    saved_imgs = [];
     if not os.path.exists(fullPath):
         os.makedirs(fullPath);
-    for img in imgs.split(';'):
+    for idx, img in enumerate(imgs.split(';')):
         resource = urlopen(img);
         #urlparts = img.split('/');
         
-        imagename = "{0}\\{1}".format(fullPath, itemLink.split('\\')[-1] + '.png');
+        imagename = "{0}\\{1}".format(fullPath, itemLink.split('\\')[-1] + str(idx + 1) + '.png');
+        saved_imgs.append(imagename);
         if not os.path.exists(imagename):
             out = open(imagename, 'wb');
             try:
@@ -143,6 +159,8 @@ def savepics(imgs, itemLink):
             print imagename + ' saved';
         else:
             print imagename + ' passed';
+            
+    return ';'.join(saved_imgs);
 
 def IsItemsCached():
     return os.path.exists(CACHEFile);
@@ -153,7 +171,7 @@ def CacheItems():
         MainMenuLinks = [];
         if not os.path.exists(imagesDir):
             os.makedirs(imagesDir);
-        page = urlopen(site_url);
+        page = urlopen(site_url + '/');
         tree = html.parse(page);
         root = tree.getroot();
         MainMenuItems = root.find_class('menu-pop-box');
@@ -176,7 +194,7 @@ def CacheItems():
             for SubMenuItem in SubMenuItems:
                 for link in SubMenuItem.iterlinks():
                     if 'witem' in link[2]:
-                        #print link[2];
+                        print 'Cached:' + link[2];
                         items_cache.write(link[2] +'\n');
                         
         items_cache.close();
@@ -186,19 +204,19 @@ def CacheItems():
 
 f = open(CSVFile, 'w');
 try:
-    f.write('{0};{1};{2};{3};{4};{5};{6};{7};{8};\n'.format('sku', 'name', 'desc', 'group', 'img', 'adImg1', 'adImg2', 'adImg3', 'adImg4'));
+    f.write('{0};{1};{2};{3};{4};{5};{6};{7};{8};{9};{10};{11};{12}\n'.format('sku', 'name', 'desc', 'group', 'img', 'adImg1', 'adImg2', 'adImg3', 'adImg4', 'adImg5', 'adImg6', 'adImg7', 'adImg8'));
     if not IsItemsCached():
         CacheItems();                  
     items_cache = open(CACHEFile, 'r');
     try:
         for itemLink in items_cache.readlines():
-            page = urlopen(site_url + itemLink);
+            page = urlopen(site_url + itemLink, timeout = 5000);
             tree = html.parse(page);
             root = tree.getroot();
             
             name_str = ParseName(root, tree);
             print 'Name:' + name_str;
-            img_str = ParseImages(root, tree);
+            img_str = ParseImages(root, tree).strip();
             print 'Images:' + img_str;
             if img_str != '':
                 savepics(img_str, itemLink);
@@ -207,15 +225,25 @@ try:
             desc_div_spec = ParseDescDiv_spec(root, tree);
             
             # основная операция
-            SKUs_NameDesc_dict = ParseSKU_DESC(desc_div_spec, tree);
+            SKUs_NameDesc_dict = ParseSKU_DESC(desc_div_spec, tree, name_str);
             
-            group_str = PrettifyCategoryStr(ParseCategory(root, tree, (len(SKUs_NameDesc_dict) > 1)));
-            print 'Category:' + group_str;
+            IsMultipleSKUs = len(SKUs_NameDesc_dict) > 1;
+            
+            group_str = PrettifyStr(ParseCategory(root, tree, IsMultipleSKUs));
+            print 'Category:' + group_str;   
             desc_str = ParseDesc(desc_div_spec, desc_div_features, tree);
+            desc_str = DeleteLineWraps(desc_str);
             #print desc_str;
             for key in SKUs_NameDesc_dict:
-                f.write(formatStr.format(key, 
-                                        '{0}({1})'.format(name_str, SKUs_NameDesc_dict[key]), 
+                encodedKey = key.encode('windows-1251', errors='ignore');
+                if IsMultipleSKUs:
+                    name_str += '(' + SKUs_NameDesc_dict[key] + ')';
+                img_str = img_str.encode('windows-1251', errors='ignore');
+                name_str = name_str.encode('windows-1251', errors='ignore');
+                group_str = group_str.encode('windows-1251', errors='ignore'); 
+                desc_str = desc_str.encode('windows-1251', errors='ignore');
+                f.write(formatStr.format(encodedKey, 
+                                        name_str, 
                                         desc_str,
                                         group_str, 
                                         img_str));
