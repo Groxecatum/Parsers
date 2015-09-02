@@ -149,12 +149,10 @@ def savepics(imgs, itemLink):
     if not os.path.exists(fullPath):
         os.makedirs(fullPath);
     for idx, img in enumerate(imgs.split(';')):
-        resource = urlopen(img);
-        #urlparts = img.split('/');
-        
         imagename = "{0}\\{1}".format(fullPath, itemLink.split('\\')[-1] + str(idx + 1) + '.png');
         saved_imgs.append(imagename);
         if not os.path.exists(imagename):
+            resource = urlopen(img);
             out = open(imagename, 'wb');
             try:
                 out.write(resource.read());
@@ -240,7 +238,7 @@ try:
             #print desc_str;
             orig_name_str = name_str;
             group_str = group_str.encode('windows-1251', errors='ignore');
-            desc_str = desc_str.encode('windows-1251', errors='ignore'); 
+            desc_str = desc_str.decode('utf-8').encode('windows-1251', errors='ignore'); 
             img_str = img_str.encode('windows-1251', errors='ignore');
             for key in SKUs_NameDesc_dict:
                 name_str = orig_name_str;
