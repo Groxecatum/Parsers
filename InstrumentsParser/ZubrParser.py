@@ -17,6 +17,7 @@ imagesDir = 'instrument_images';
 CSVFile = 'instrument_parse-results.csv';
 CACHEFile = 'itemlinks.txt';
 formatStr = '{0};{1};{2};{3};{4}\n';
+maxAdditionalImages = 8;
 #-------------------------------------------------------------------   
 def DeleteSpacesFromMiddle(Str):
     Str = re.sub("\s{2}", '', Str);
@@ -124,6 +125,8 @@ def ParseImages(root, tree):
         for imageLink in galleryClass.iterlinks():
             if 'type=resize&w=800&h=600' in imageLink[2]:
                 res.append(site_url + imageLink[2]);
+    while len(res) <= maxAdditionalImages + 1:
+        res.append('');
     resStr = ';'.join(res); 
     return resStr;
 
@@ -131,6 +134,7 @@ def ParseCategory(root, tree, IsMultipleSKUs): # если артикулов б�
     box = root.get_element_by_id('content-box');
     way = box.find_class('way').pop();
     way = way.text_content();
+    way = way.replace(u'Слесарно/столярный', u'Слесарно\столярный' );
     wayParts = way.split('/');
     way = '';
     for wayPart in wayParts:
@@ -149,18 +153,21 @@ def savepics(imgs, itemLink):
     if not os.path.exists(fullPath):
         os.makedirs(fullPath);
     for idx, img in enumerate(imgs.split(';')):
-        imagename = "{0}\\{1}".format(fullPath, itemLink.split('\\')[-1] + str(idx + 1) + '.png');
-        saved_imgs.append(imagename);
-        if not os.path.exists(imagename):
-            resource = urlopen(img);
-            out = open(imagename, 'wb');
-            try:
-                out.write(resource.read());
-            finally:
-                out.close(); 
-            print imagename + ' saved';
+        if img != '':
+            imagename = "{0}\\{1}".format(fullPath, itemLink.split('\\')[-1] + str(idx + 1) + '.png');
+            saved_imgs.append(imagename.replace('\\', '/'));
+            if not os.path.exists(imagename):
+                resource = urlopen(img);
+                out = open(imagename, 'wb');
+                try:
+                    out.write(resource.read());
+                finally:
+                    out.close(); 
+                print imagename + ' saved';
+            else:
+                print imagename + ' passed';
         else:
-            print imagename + ' passed';
+            saved_imgs.append(''); 
             
     return ';'.join(saved_imgs);
 
