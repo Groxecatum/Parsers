@@ -58,7 +58,7 @@ def getNameStrFromVertical(tableArray): # Один артикул - обходи
             for col in row:
                 pass;
             # если это последняя колонка(со значениями)
-            ResList.append(col);
+            ResList.append(DeleteLineWraps(col.strip()));
     return ','.join(ResList);
 
 def getNameStrFromHorizontal(row): # обходим только один ряд. кроме первого столбца - артикула
@@ -66,7 +66,7 @@ def getNameStrFromHorizontal(row): # обходим только один ряд
     ColsList = [];
     for idx, col in enumerate(row):
         if idx:    # Не значение артикула
-            ColsList.append(col);
+            ColsList.append(DeleteLineWraps(col.strip()));
         #first = False; 
     return ','.join(ColsList);         
 
@@ -111,9 +111,9 @@ def ParseDescDiv_features(root, tree):
 def ParseDesc(desc_div_spec, desc_div_features, tree):
     res = ''; 
     for child in desc_div_features.getchildren():
-        res += html.tostring(child).replace(';', ',');
+        res += html.tostring(child, encoding='utf-8').replace(';', ',');
     for child in desc_div_spec.getchildren():
-        res += html.tostring(child).replace(';', ',');
+        res += html.tostring(child, encoding='utf-8').replace(';', ',');
     #print res;
     return res;
 
