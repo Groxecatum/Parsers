@@ -7,6 +7,8 @@ Created on 28.08.2015.
 '''
 import os;
 import re;
+import threading;
+import time;
 from urllib2 import urlopen;
 import lxml.html as html;
 
@@ -15,6 +17,7 @@ import lxml.html as html;
 site_url='http://zubr.ru';
 imagesDir = 'instrument_images';
 CSVFile = 'instrument_parse-results.csv';
+CSVFilePart = 'instrument_parse-results-part-{0}.csv';
 CACHEFile = 'itemlinks.txt';
 formatStr = '{0};{1};{2};{3};{4}\n';
 maxAdditionalImages = 8;
@@ -125,7 +128,7 @@ def ParseImages(root, tree):
         for imageLink in galleryClass.iterlinks():
             if 'type=resize&w=800&h=600' in imageLink[2]:
                 res.append(site_url + imageLink[2]);
-    while len(res) <= maxAdditionalImages + 1:
+    while len(res) <= maxAdditionalImages:
         res.append('');
     resStr = ';'.join(res); 
     return resStr;
@@ -210,15 +213,86 @@ def CacheItems():
     except:
         items_cache.close();
         raise;
-
-f = open(CSVFile, 'a+');
-try:
-    f.write('{0};{1};{2};{3};{4};{5};{6};{7};{8};{9};{10};{11};{12}\n'.format('sku', 'name', 'desc', 'group', 'img', 'adImg1', 'adImg2', 'adImg3', 'adImg4', 'adImg5', 'adImg6', 'adImg7', 'adImg8'));
-    if not IsItemsCached():
-        CacheItems();                  
-    items_cache = open(CACHEFile, 'r');
+    
+def ParseItems(linkLines, lock, part):
+    f = open(CSVFilePart.format(part), 'w+');
     try:
-        for itemLink in items_cache.readlines():
+        f.write('{0};{1};{2};{3};{4};{5};{6};{7};{8};{9};{10};{11};{12}\n'.format('sku', 'name', 'desc', 'group', 'img', 'adImg1', 'adImg2', 'adImg3', 'adImg4', 'adImg5', 'adImg6', 'adImg7', 'adImg8'));
+        for itemLink in linkLines:
+            page = urlopen(site_url + itemLink, timeout = 5000);
+            tree = html.parse(page);
+            root = tree.getroot(); 
+            name_str = ParseName(root, tree);
+            print 'Name:' + name_str;
+            img_str = ParseImages(root, tree).strip();
+            print 'Images links:' + img_str;
+            if img_str != '':
+                img_str = savepics(img_str, itemLink);
+                
+            print 'Images paths:' + img_str;    
+            desc_div_features = ParseDescDiv_features(root, tree);    
+            desc_div_spec = ParseDescDiv_spec(root, tree);
+            
+            # основная операция
+            SKUs_NameDesc_dict = ParseSKU_DESC(desc_div_spec, tree, name_str);
+            
+            IsMultipleSKUs = len(SKUs_NameDesc_dict) > 1;
+            
+            group_str = PrettifyStr(ParseCategory(root, tree, IsMultipleSKUs));
+            print 'Category:' + group_str;   
+            desc_str = ParseDesc(desc_div_spec, desc_div_features, tree);
+            desc_str = DeleteLineWraps(desc_str);
+            #print desc_str;
+            orig_name_str = name_str;
+            group_str = group_str.encode('windows-1251', errors='ignore');
+            desc_str = desc_str.decode('utf-8').encode('windows-1251', errors='ignore'); 
+            img_str = img_str.encode('windows-1251', errors='ignore');
+            for key in SKUs_NameDesc_dict:
+                name_str = orig_name_str;
+                encodedKey = key.encode('windows-1251', errors='ignore');
+                if IsMultipleSKUs:
+                    name_str = orig_name_str + '(' + SKUs_NameDesc_dict[key] + ')';
+                name_str = name_str.encode('windows-1251', errors='ignore');
+                with lock:
+                    #file = open(CSVFile, 'a+');
+                    #try:
+                    f.write(formatStr.format(encodedKey, 
+                                                name_str, 
+                                                desc_str,
+                                                group_str, 
+                                                img_str));  
+                    #finally:
+                        #file.close();
+            #time.sleep(5);
+    finally:
+        f.close();
+        
+def createThread(threads):
+    t = threading.Thread(target=ParseItems, args=(threadItems[:], lock, len(threads))); 
+    threads.append(t);
+               
+   
+if not IsItemsCached():
+    CacheItems();  
+      
+lock = threading.Lock();
+threadItems = [];
+threads = [];              
+items_cache = open(CACHEFile, 'r');
+try:
+    for itemLink in items_cache.readlines():
+        threadItems.append(itemLink);
+        if len(threadItems) >= 500:
+            threadItems = createThread(threads);
+            threadItems = []; 
+    if len(threadItems):
+        createThread(threads);
+        threadItems = [];    
+    print len(threads);
+    for thread in threads:
+        thread.start();
+        #thread.join();
+        '''for itemLink in items_cache.readlines():
             page = urlopen(site_url + itemLink, timeout = 5000);
             tree = html.parse(page);
             root = tree.getroot(); 
@@ -258,12 +332,12 @@ try:
                                         desc_str,
                                         group_str, 
                                         img_str));
-            #print itemLink.strip();
-        items_cache.close();  
-    except:
-        items_cache.close();   
-        raise       
-    f.close();
-except:
-    f.close();
-    raise
+            #print itemLink.strip();'''
+    #items_cache.close();  
+finally:
+    items_cache.close();   
+    #raise       
+    #f.close();
+#except:
+    #f.close();
+    #raise
