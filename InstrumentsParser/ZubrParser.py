@@ -8,16 +8,14 @@ Created on 28.08.2015.
 import os;
 import re;
 import threading;
-import time;
 from urllib2 import urlopen;
 import lxml.html as html;
 
 #-----------------------------------------------------------------
 
 site_url='http://zubr.ru';
-imagesDir = 'instrument_images';
-CSVFile = 'instrument_parse-results.csv';
-CSVFilePart = 'instrument_parse-results-part-{0}.csv';
+#imagesDir = 'instrument_images';
+CSVFilePart = 'zubr_parse-results-part-{0}.csv';
 CACHEFile = 'itemlinks.txt';
 formatStr = '{0};{1};{2};{3};{4}\n';
 maxAdditionalImages = 8;
@@ -181,8 +179,8 @@ def CacheItems():
     items_cache = open(CACHEFile, 'w');
     try:  
         MainMenuLinks = [];
-        if not os.path.exists(imagesDir):
-            os.makedirs(imagesDir);
+        #if not os.path.exists(imagesDir):
+            #os.makedirs(imagesDir);
         page = urlopen(site_url + '/');
         tree = html.parse(page);
         root = tree.getroot();
@@ -267,7 +265,7 @@ def ParseItems(linkLines, lock, part):
     finally:
         f.close();
         
-def createThread(threads):
+def createThread(threads, lock, threadItems):
     t = threading.Thread(target=ParseItems, args=(threadItems[:], lock, len(threads))); 
     threads.append(t);
                
@@ -282,62 +280,14 @@ items_cache = open(CACHEFile, 'r');
 try:
     for itemLink in items_cache.readlines():
         threadItems.append(itemLink);
-        if len(threadItems) >= 500:
-            threadItems = createThread(threads);
+        if len(threadItems) >= 300:
+            createThread(threads, lock, threadItems);
             threadItems = []; 
     if len(threadItems):
-        createThread(threads);
+        createThread(threads, lock, threadItems);
         threadItems = [];    
     print len(threads);
     for thread in threads:
-        thread.start();
-        #thread.join();
-        '''for itemLink in items_cache.readlines():
-            page = urlopen(site_url + itemLink, timeout = 5000);
-            tree = html.parse(page);
-            root = tree.getroot(); 
-            name_str = ParseName(root, tree);
-            print 'Name:' + name_str;
-            img_str = ParseImages(root, tree).strip();
-            print 'Images links:' + img_str;
-            if img_str != '':
-                img_str = savepics(img_str, itemLink);
-                
-            print 'Images paths:' + img_str;    
-            desc_div_features = ParseDescDiv_features(root, tree);    
-            desc_div_spec = ParseDescDiv_spec(root, tree);
-            
-            # основная операция
-            SKUs_NameDesc_dict = ParseSKU_DESC(desc_div_spec, tree, name_str);
-            
-            IsMultipleSKUs = len(SKUs_NameDesc_dict) > 1;
-            
-            group_str = PrettifyStr(ParseCategory(root, tree, IsMultipleSKUs));
-            print 'Category:' + group_str;   
-            desc_str = ParseDesc(desc_div_spec, desc_div_features, tree);
-            desc_str = DeleteLineWraps(desc_str);
-            #print desc_str;
-            orig_name_str = name_str;
-            group_str = group_str.encode('windows-1251', errors='ignore');
-            desc_str = desc_str.decode('utf-8').encode('windows-1251', errors='ignore'); 
-            img_str = img_str.encode('windows-1251', errors='ignore');
-            for key in SKUs_NameDesc_dict:
-                name_str = orig_name_str;
-                encodedKey = key.encode('windows-1251', errors='ignore');
-                if IsMultipleSKUs:
-                    name_str = orig_name_str + '(' + SKUs_NameDesc_dict[key] + ')';
-                name_str = name_str.encode('windows-1251', errors='ignore');
-                f.write(formatStr.format(encodedKey, 
-                                        name_str, 
-                                        desc_str,
-                                        group_str, 
-                                        img_str));
-            #print itemLink.strip();'''
-    #items_cache.close();  
+        thread.start(); 
 finally:
     items_cache.close();   
-    #raise       
-    #f.close();
-#except:
-    #f.close();
-    #raise
