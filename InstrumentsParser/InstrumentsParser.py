@@ -69,7 +69,10 @@ def PrettifyStr(Str):
     return Str;
 
 def ParseDescElement(root, tree):
-    return root.find_class('item_desc').pop();
+    return root.get_element_by_id('product-description');
+
+def ParseSpecsElement(root, tree):
+    return root.get_element_by_id('product-features');
 
 def savepics(imgs, itemLink):
     itemLink = itemLink.replace(site_url, '').strip();
@@ -100,29 +103,26 @@ def savepics(imgs, itemLink):
 
 def ParseImages(root, tree):
     res = [];
-    main_image_div = root.find_class('photo_container').pop(); # Забираем основное фото
+    main_image_div = root.get_element_by_id('product-core-image'); # Забираем основное фото
     for imageLink in main_image_div.iterlinks():
-        if 'http://www.stayer-tools.com/files/' in imageLink[2]:
-            res.append(imageLink[2]);
-    
-    additional_images = root.find_class('big_mini_img_t');
-    if len(additional_images):        
-        sub_image_div = root.find_class('big_mini_img_t').pop(); # Забираем доп. фото
-        for imageLink in sub_image_div.iterlinks():
-            if 'http://www.stayer-tools.com/files/' in imageLink[2]:
-                res.append(imageLink[2]);
-        while len(res) <= maxAdditionalImages:
-            res.append('');
+        if '.970' in imageLink[2]:
+            res.append(site_url + imageLink[2]);
+            
     resStr = ';'.join(res); 
     return resStr;
 
 def ParseName(root, tree):
-    title = root.find_class('right_tit').pop();
-    return title.text_content().strip();
+    title = root.get_element_by_id('page-content');
+    span = title.xpath('./article/h1/span');
+    return span[0].text_content();
 
-def ParseDesc(desc_div, tree):
+def ParseDesc(desc_div, desc_div_specs, tree):
     res = ''; 
     for child in desc_div.getchildren():
+        res += html.tostring(child, encoding='utf-8').replace(';', ',');
+        
+    res = ''; 
+    for child in desc_div_specs.getchildren():
         res += html.tostring(child, encoding='utf-8').replace(';', ',');
     #print res;
     return res;
@@ -175,28 +175,29 @@ def ParseItems(linkLines, lock, part):
         res_file.write('{0};{1};{2};{3};{4};{5};{6};{7};{8};{9};{10};{11};{12}\n'.format('sku', 'name', 'desc', 'group', 'img', 'adImg1', 'adImg2', 'adImg3', 'adImg4', 'adImg5', 'adImg6', 'adImg7', 'adImg8'));
         for itemLink in linkLines:
             itemLink = itemLink.strip();
-            page = urlopen(itemLink, timeout = 5000);
+            page = urlopen(site_url + itemLink, timeout = 10000);
             tree = html.parse(page);
             root = tree.getroot(); 
-            print 'Item link:' + itemLink;
+            print 'Item link: ' + site_url + itemLink;
             name_str = ParseName(root, tree);
-            print 'Name:' + name_str;
+            print 'Name: ' + name_str;
             img_str = ParseImages(root, tree).strip();
             print 'Images links:' + img_str;
             if img_str != '':
                 img_str = savepics(img_str, itemLink);
                 
             print 'Images paths:' + img_str;    
-            desc_div = ParseDescElement(root, tree);    
+            desc_div = ParseDescElement(root, tree);
+            desc_div_specs = ParseSpecsElement(root, tree);    
             
             # основная операция
-            SKUs_NameDesc_dict = ParseSKU_DESC(desc_div, tree, name_str);
+            SKUs_NameDesc_dict = ParseSKU_DESC(desc_div_specs, tree, name_str);
             
             IsMultipleSKUs = len(SKUs_NameDesc_dict) > 1;
             
             group_str = PrettifyStr(ParseCategory(root, tree, IsMultipleSKUs));
             print 'Category:' + group_str;   
-            desc_str = PrettifyStr(ParseDesc(desc_div, tree));
+            desc_str = PrettifyStr(ParseDesc(desc_div, desc_div_specs, tree));
             #print desc_str;
             orig_name_str = name_str;
             group_str = group_str.encode('windows-1251', errors='ignore');
@@ -213,7 +214,7 @@ def ParseItems(linkLines, lock, part):
                                         name_str, 
                                         desc_str,
                                         group_str, 
-                                        img_str));  
+                                        img_str)); 
     finally:
         res_file.close();
 
@@ -273,13 +274,13 @@ def CacheItems():
 if not IsItemsCached():
     CacheItems();  
       
-'''lock = threading.Lock();
+lock = threading.Lock();
 threadItems = [];
 threads = [];              
 items_cache = open(CACHEFile, 'r');
 try:
     ParseItems(items_cache.readlines(), lock, 0);
-    for itemLink in items_cache.readlines():
+    '''for itemLink in items_cache.readlines():
         threadItems.append(itemLink);
         if len(threadItems) >= 250:
             threadItems = createThread(threads, lock, threadItems);
@@ -289,6 +290,6 @@ try:
         threadItems = [];    
     print len(threads);
     for thread in threads:
-        thread.start();
+        thread.start();'''
 finally:
-    items_cache.close();'''
+    items_cache.close();
