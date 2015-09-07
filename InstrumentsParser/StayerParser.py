@@ -169,9 +169,9 @@ def ParseSKU_DESC(desc_div, tree, sku_default):
     return Result;
 
 def ParseItems(linkLines, lock, part):
-    file = open(CSVFilePart.format(part), 'w+', 0);
+    res_file = open(CSVFilePart.format(part), 'w+', 0);
     try:
-        file.write('{0};{1};{2};{3};{4};{5};{6};{7};{8};{9};{10};{11};{12}\n'.format('sku', 'name', 'desc', 'group', 'img', 'adImg1', 'adImg2', 'adImg3', 'adImg4', 'adImg5', 'adImg6', 'adImg7', 'adImg8'));
+        res_file.write('{0};{1};{2};{3};{4};{5};{6};{7};{8};{9};{10};{11};{12}\n'.format('sku', 'name', 'desc', 'group', 'img', 'adImg1', 'adImg2', 'adImg3', 'adImg4', 'adImg5', 'adImg6', 'adImg7', 'adImg8'));
         for itemLink in linkLines:
             itemLink = itemLink.strip();
             page = urlopen(itemLink, timeout = 5000);
@@ -208,13 +208,13 @@ def ParseItems(linkLines, lock, part):
                     name_str = orig_name_str + '(' + SKUs_NameDesc_dict[key] + ')';
                 name_str = name_str.encode('windows-1251', errors='ignore');
                 #with lock:
-                file.write(formatStr.format(encodedKey, 
+                res_file.write(formatStr.format(encodedKey, 
                                         name_str, 
                                         desc_str,
                                         group_str, 
                                         img_str));  
     finally:
-        file.close();
+        res_file.close();
 
 def createThread(threads, lock, threadItems):
     t = threading.Thread(target=ParseItems, args=(threadItems[:], lock, len(threads))); 
