@@ -69,10 +69,10 @@ def PrettifyStr(Str):
     return Str;
 
 def ParseDescElement(root, tree):
-    return root.get_element_by_id('product-description');
+    return root.get_element_by_id('product-description', default=None);
 
 def ParseSpecsElement(root, tree):
-    return root.get_element_by_id('product-features');
+    return root.get_element_by_id('product-features', default=None);
 
 def savepics(imgs, itemLink):
     itemLink = itemLink.replace(site_url, '').strip();
@@ -117,13 +117,14 @@ def ParseName(root, tree):
     return span[0].text_content();
 
 def ParseDesc(desc_div, desc_div_specs, tree):
-    res = ''; 
-    for child in desc_div.getchildren():
-        res += html.tostring(child, encoding='utf-8').replace(';', ',');
-        
-    res = ''; 
-    for child in desc_div_specs.getchildren():
-        res += html.tostring(child, encoding='utf-8').replace(';', ',');
+    res = '';
+    if desc_div is not None:  
+        for child in desc_div.getchildren():
+            res += html.tostring(child, encoding='utf-8').replace(';', ',');
+         
+    if desc_div is not None:  
+        for child in desc_div_specs.getchildren():
+            res += html.tostring(child, encoding='utf-8').replace(';', ',');
     #print res;
     return res;
 
@@ -148,31 +149,21 @@ def getNameStrFromHorizontal(row): # обходим только один ряд
 
 def ParseSKU_DESC(desc_div, tree, sku_default):
     Result = {};
-    table_div = desc_div.find_class('table_har').pop();  
-    for child in table_div.getchildren():  
-        if child.tag == 'table': 
-            tableArray = tabletoList(child);
-            # если артикулов несколько - уточняем название товара в скобках
-            if (tableArray[0][0] == u'Артикул'):
-                # если артикул один - называем как есть
-                # таблица построена вертикально 
-                if IsSKU(tableArray[0][1]):                              # Если элемент справа - артикул - забираем его
-                    Result[tableArray[0][1]] = getNameStrFromVertical(tableArray); # и крепим к нему все свойства   
-                else:
-                    if IsSKU(tableArray[1][0]):   
-                        for idx, row in enumerate(tableArray):
-                            if idx:    #Не шапка
-                                cols_str = getNameStrFromHorizontal(row);
-                                Result[row[0]] = cols_str;
-                    else: # Не нашли артикул - используем имя товара
-                        Result[sku_default] = '';
-                        
+    root = tree.getroot();
+    # Парсим артикул - он у них отдельно
+    cart_form = root.get_element_by_id('cart-form');
+    if cart_form is not None:
+        sku_span = cart_form.xpath('/div/span');
+        if sku_span is not None:
+            Result[sku_span.text_content().strip()] = '';  
+    if len(Result = 0):
+        Result[sku_default] = '';                     
     return Result;
 
 def ParseItems(linkLines, lock, part):
     res_file = open(CSVFilePart.format(part), 'w+', 0);
     try:
-        res_file.write('{0};{1};{2};{3};{4};{5};{6};{7};{8};{9};{10};{11};{12}\n'.format('sku', 'name', 'desc', 'group', 'img', 'adImg1', 'adImg2', 'adImg3', 'adImg4', 'adImg5', 'adImg6', 'adImg7', 'adImg8'));
+        res_file.write('{0};{1};{2};{3};{4}\n'.format('sku', 'name', 'desc', 'group', 'img'));
         for itemLink in linkLines:
             itemLink = itemLink.strip();
             page = urlopen(site_url + itemLink, timeout = 10000);
@@ -193,7 +184,7 @@ def ParseItems(linkLines, lock, part):
             # основная операция
             SKUs_NameDesc_dict = ParseSKU_DESC(desc_div_specs, tree, name_str);
             
-            IsMultipleSKUs = len(SKUs_NameDesc_dict) > 1;
+            IsMultipleSKUs = False; # Здесь только одиночные артикулы. Но что бы не рушить логику ниже - проще просто переназначить.
             
             group_str = PrettifyStr(ParseCategory(root, tree, IsMultipleSKUs));
             print 'Category:' + group_str;   
