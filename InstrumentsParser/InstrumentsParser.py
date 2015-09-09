@@ -8,12 +8,14 @@ Created on 30 авг. 2015 �.
 import os;
 import re;
 import threading;
+import time;
 from urllib2 import urlopen;
 import lxml.html as html;
 
 #===================================================================================================================
 site_url = 'http://instrument.ru';
 pages_ended_str = u'В этой категории нет ни одного товара.';
+pages_ended_str2 = u'Не найдено ни одного товара.'
 CSVFilePart = 'instrument_parse-results-part-{0}.csv';
 CACHEFile = 'itemlinks_instrument.txt';
 formatStr = '{0};{1};{2};{3};{4}\n';
@@ -84,6 +86,7 @@ def savepics(imgs, itemLink):
             imagename = "{0}\\{1}".format(fullPath, img.split('/')[-1]);
             saved_imgs.append(imagename.replace('\\', '/'));
             if not os.path.exists(imagename):
+                print 'Opening image: ' + img;
                 resource = urlopen(img);
                 out = open(imagename, 'wb');
                 try:
@@ -143,7 +146,11 @@ def ParseItems(linkLines, lock, part):
         res_file.write('{0};{1};{2};{3};{4}\n'.format('sku', 'name', 'desc', 'group', 'img'));
         for itemLink in linkLines:
             itemLink = itemLink.strip();
-            page = urlopen(site_url + itemLink, timeout = 10000);
+            try:
+                page = urlopen(site_url + itemLink, timeout = 10000);
+            except:
+                time.sleep(30);
+                page = urlopen(site_url + itemLink, timeout = 10000);
             tree = html.parse(page);
             root = tree.getroot(); 
             print 'Item link: ' + site_url + itemLink;
@@ -220,17 +227,22 @@ def CacheItems():
         for MainMenuLink in MainMenuLinks:
             page_num = 1;
             while True:
-                page = urlopen(site_url + MainMenuLink + '?page={0}'.format(page_num), timeout = 10000);
-                tree = html.parse(page);
-                root = tree.getroot();
-                lst = root.get_element_by_id('product-list');
-                if lst.text_content() == pages_ended_str:
-                    break;
-                else: 
-                    for link in lst.iterlinks():
-                        if re.search('^/\d{1,6}|\d{1,6}_ru/$', link[2]):
-                            print 'Cached:' + link[2];
-                            items_cache.write(link[2] +'\n');    
+                try:
+                    print 'Opening: ' + site_url + MainMenuLink + '?page={0}'.format(page_num);
+                    page = urlopen(site_url + MainMenuLink + '?page={0}'.format(page_num), timeout = 10000);
+                    tree = html.parse(page);
+                    root = tree.getroot();
+                    lst = root.get_element_by_id('product-list');
+                    if (pages_ended_str in lst.text_content()) or (pages_ended_str2 in lst.text_content()):
+                        break;
+                    else: 
+                        for link in lst.iterlinks():
+                            if re.search('^/\d{1,6}|\d{1,6}_ru/$', link[2]):
+                                print 'Cached:' + link[2];
+                                items_cache.write(link[2] +'\n');    
+                except:
+                    print site_url + MainMenuLink + '?page={0}'.format(page_num) + ' is broken!!!';
+                    continue;
                 
                 page_num += 1;        
         items_cache.close();
@@ -247,8 +259,8 @@ threadItems = [];
 threads = [];              
 items_cache = open(CACHEFile, 'r');
 try:
-    ParseItems(items_cache.readlines(), lock, 0);
-    '''for itemLink in items_cache.readlines():
+    #ParseItems(items_cache.readlines(), lock, 0);
+    for itemLink in items_cache.readlines():
         threadItems.append(itemLink);
         if len(threadItems) >= 250:
             threadItems = createThread(threads, lock, threadItems);
@@ -258,6 +270,6 @@ try:
         threadItems = [];    
     print len(threads);
     for thread in threads:
-        thread.start();'''
+        thread.start();
 finally:
     items_cache.close();
