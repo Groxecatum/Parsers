@@ -20,31 +20,20 @@ formatStr = '{0};{1};{2};{3};{4}\n';
 maxAdditionalImages = 8;
 #===================================================================================================================
 def ParseCategory(root, tree, IsMultipleSKUs): # если артикулов больше одного - тогда название входит как название группы
-    way = root.find_class('navigator').pop();
+    way = root.find_class('breadcrumbs').pop();
     way = way.text_content();
-    wayParts = way.split('/');
+    wayParts = way.split(u'→');
+    wayParts.remove(wayParts[0]);
     wayParts.remove(wayParts[-1]);
     way = '';
     for wayPart in wayParts:
         wayPart = PrettifyStr(wayPart.strip());
-        not_last_part_of_multisku = IsMultipleSKUs and (wayPart != PrettifyStr(wayParts[-1].strip()));
-        not_last_part_of_singlesku = (not IsMultipleSKUs) and (wayPart != PrettifyStr(wayParts[-2].strip())); 
-        if ((wayPart != PrettifyStr(wayParts[-1])) or IsMultipleSKUs) and (wayPart != 'STAYER'):   
-            way += PrettifyStr(wayPart).strip();
-            if not_last_part_of_singlesku or not_last_part_of_multisku:
-                way += '|';
-    return way;
-
-def tabletoList(tableElem):
-    tableArray = [];
-    for tbody in tableElem.getchildren():
-        for row in tbody.getchildren():
-            tableRow = [];
-            for col in row.getchildren():
-                tableRow.append(col.text_content().strip());
-            if (tableRow != []):
-                tableArray.append(tableRow);
-    return tableArray;            
+        not_last_part_of_singlesku = wayPart != PrettifyStr(wayParts[-1].strip()); 
+        #if wayPart != PrettifyStr(wayParts[-1]):   
+        way += wayPart;
+        if not_last_part_of_singlesku:
+            way += '|';
+    return way;     
 
 def IsSKU(Str): #строка содержит 5+ цифр(подряд?)
     Res = (re.search('\d', Str) != None) or (re.search('-', Str) != None); 
@@ -69,16 +58,24 @@ def PrettifyStr(Str):
     return Str;
 
 def ParseDescElement(root, tree):
-    return root.get_element_by_id('product-description', default=None);
+    try:
+        elem = root.get_element_by_id('product-description');
+    except KeyError:
+        elem = None;
+    return elem;
 
 def ParseSpecsElement(root, tree):
-    return root.get_element_by_id('product-features', default=None);
+    try:
+        elem = root.get_element_by_id('product-features');
+    except KeyError:
+        elem = None;
+    return elem;
 
 def savepics(imgs, itemLink):
     itemLink = itemLink.replace(site_url, '').strip();
     itemLink = itemLink[:-1];
     itemLink = itemLink.replace('/', '\\');
-    fullPath = r'images\stayer' + itemLink;
+    fullPath = r'images\instrument' + itemLink;
     saved_imgs = [];
     if not os.path.exists(fullPath):
         os.makedirs(fullPath);
@@ -128,35 +125,15 @@ def ParseDesc(desc_div, desc_div_specs, tree):
     #print res;
     return res;
 
-def getNameStrFromVertical(tableArray): # Один артикул - обходим всю таблицу Кроме первого элемента - шапка
-    ResList = [];
-    for idx, row in enumerate(tableArray):
-        if idx:
-            for col in row:
-                pass;
-            # если это последняя колонка(со значениями)
-            ResList.append(DeleteLineWraps(col.strip()));
-    return ','.join(ResList);
-
-def getNameStrFromHorizontal(row): # обходим только один ряд. кроме первого столбца - артикула
-    #first = True;
-    ColsList = [];
-    for idx, col in enumerate(row):
-        if idx:    # Не значение артикула
-            ColsList.append(DeleteLineWraps(col.strip()));
-        #first = False; 
-    return ','.join(ColsList);  
-
 def ParseSKU_DESC(desc_div, tree, sku_default):
     Result = {};
     root = tree.getroot();
     # Парсим артикул - он у них отдельно
     cart_form = root.get_element_by_id('cart-form');
-    if cart_form is not None:
-        sku_span = cart_form.xpath('/div/span');
-        if sku_span is not None:
-            Result[sku_span.text_content().strip()] = '';  
-    if len(Result = 0):
+    sku_span = cart_form.xpath('./div/span').pop();
+    if sku_span is not None:
+        Result[sku_span.text_content().strip()] = '';  
+    if len(Result) == 0:
         Result[sku_default] = '';                     
     return Result;
 
