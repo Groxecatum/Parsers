@@ -7,6 +7,7 @@ Created on 28.08.2015.
 '''
 import os;
 import re;
+import time;
 import threading;
 from urllib2 import urlopen;
 import lxml.html as html;
@@ -158,7 +159,11 @@ def savepics(imgs, itemLink):
             imagename = "{0}\\{1}".format(fullPath, itemLink.split('\\')[-1] + str(idx + 1) + '.png');
             saved_imgs.append(imagename.replace('\\', '/'));
             if not os.path.exists(imagename):
-                resource = urlopen(img);
+                try:
+                    resource = urlopen(img, timeout = 10000);
+                except: 
+                    time.sleep(30);
+                    resource = urlopen(img, timeout = 10000);
                 out = open(imagename, 'wb');
                 try:
                     out.write(resource.read());
@@ -217,7 +222,12 @@ def ParseItems(linkLines, lock, part):
     try:
         f.write('{0};{1};{2};{3};{4};{5};{6};{7};{8};{9};{10};{11};{12}\n'.format('sku', 'name', 'desc', 'group', 'img', 'adImg1', 'adImg2', 'adImg3', 'adImg4', 'adImg5', 'adImg6', 'adImg7', 'adImg8'));
         for itemLink in linkLines:
-            page = urlopen(site_url + itemLink, timeout = 5000);
+            try:
+                page = urlopen(site_url + itemLink, timeout = 10000);
+            except: 
+                time.sleep(30);
+                page = urlopen(site_url + itemLink, timeout = 10000);
+            
             tree = html.parse(page);
             root = tree.getroot(); 
             name_str = ParseName(root, tree);

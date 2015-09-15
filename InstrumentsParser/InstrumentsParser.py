@@ -87,7 +87,11 @@ def savepics(imgs, itemLink):
             saved_imgs.append(imagename.replace('\\', '/'));
             if not os.path.exists(imagename):
                 print 'Opening image: ' + img;
-                resource = urlopen(img);
+                try:
+                    resource = urlopen(img, timeout = 10000);
+                except: 
+                    time.sleep(30);
+                    resource = urlopen(img, timeout = 10000);
                 out = open(imagename, 'wb');
                 try:
                     out.write(resource.read());
@@ -114,7 +118,7 @@ def ParseImages(root, tree):
 def ParseName(root, tree):
     title = root.get_element_by_id('page-content');
     span = title.xpath('./article/h1/span');
-    return span[0].text_content();
+    return span[0].text_content().replace(';', ',');
 
 def ParseDesc(desc_div, desc_div_specs, tree):
     res = '';
