@@ -136,13 +136,13 @@ def ParseCategory(root, tree, IsMultipleSKUs): # если артикулов б�
     box = root.get_element_by_id('content-box');
     way = box.find_class('way').pop();
     way = way.text_content();
-    way = way.replace(u'Слесарно/столярный', u'Слесарно\столярный' );
+    way = way.replace(u'Столярно/слесарный', u'Столярно\слесарный' );
     wayParts = way.split('/');
     way = '';
     for wayPart in wayParts:
         if (wayPart != wayParts[-1]) or IsMultipleSKUs:
-            wayPart = wayPart.strip(); 
-            way += PrettifyStr(wayPart).strip();
+            wayPart = PrettifyStr(wayPart.replace(' - ', '')).strip(); 
+            way += wayPart;
             if (((not IsMultipleSKUs) and (wayPart != PrettifyStr(wayParts[-2].strip()))) or
                 (IsMultipleSKUs and (wayPart != PrettifyStr(wayParts[-1].strip())))):
                 way += '|';
@@ -161,8 +161,9 @@ def savepics(imgs, itemLink):
             if not os.path.exists(imagename):
                 try:
                     resource = urlopen(img, timeout = 10000);
-                except: 
-                    time.sleep(30);
+                except:
+                    print 'Waiting for URL to open' 
+                    time.sleep(30); 
                     resource = urlopen(img, timeout = 10000);
                 out = open(imagename, 'wb');
                 try:
@@ -225,6 +226,7 @@ def ParseItems(linkLines, lock, part):
             try:
                 page = urlopen(site_url + itemLink, timeout = 10000);
             except: 
+                print 'Waiting for URL to open'  
                 time.sleep(30);
                 page = urlopen(site_url + itemLink, timeout = 10000);
             
