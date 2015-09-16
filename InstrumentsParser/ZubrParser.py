@@ -51,7 +51,7 @@ def tabletoList(tableElem):
     return tableArray;            
 
 def IsSKU(Str): #строка содержит 5+ цифр(подряд?)
-    Res = (re.search('\d', Str) != None) or (re.search('-', Str) != None); 
+    Res = (re.search('\d{2,}', Str) != None) or (re.search('-', Str) != None); 
     return Res;
         
 def getNameStrFromVertical(tableArray): # Один артикул - обходим всю таблицу Кроме первого элемента - шапка
