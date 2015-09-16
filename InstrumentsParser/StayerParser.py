@@ -117,7 +117,7 @@ def ParseImages(root, tree):
 
 def ParseName(root, tree):
     title = root.find_class('right_tit').pop();
-    return title.text_content().strip();
+    return title.text_content().strip().replace(';', ',');
 
 def ParseDesc(desc_div, tree):
     res = ''; 
@@ -156,13 +156,13 @@ def ParseSKU_DESC(desc_div, tree, sku_default):
                 # если артикул один - называем как есть
                 # таблица построена вертикально 
                 if IsSKU(tableArray[0][1]):                              # Если элемент справа - артикул - забираем его
-                    Result[tableArray[0][1]] = getNameStrFromVertical(tableArray); # и крепим к нему все свойства   
+                    Result[tableArray[0][1].replace(';', ',')] = getNameStrFromVertical(tableArray).replace(';', ','); # и крепим к нему все свойства   
                 else:
                     if IsSKU(tableArray[1][0]):   
                         for idx, row in enumerate(tableArray):
                             if idx:    #Не шапка
-                                cols_str = getNameStrFromHorizontal(row);
-                                Result[row[0]] = cols_str;
+                                cols_str = getNameStrFromHorizontal(row).replace(';', ',');
+                                Result[row[0].replace(';', ',')] = cols_str;
                     else: # Не нашли артикул - используем имя товара
                         Result[sku_default] = '';
                         
@@ -174,7 +174,12 @@ def ParseItems(linkLines, lock, part):
         res_file.write('{0};{1};{2};{3};{4};{5};{6};{7};{8};{9};{10};{11};{12}\n'.format('sku', 'name', 'desc', 'group', 'img', 'adImg1', 'adImg2', 'adImg3', 'adImg4', 'adImg5', 'adImg6', 'adImg7', 'adImg8'));
         for itemLink in linkLines:
             itemLink = itemLink.strip();
-            page = urlopen(itemLink, timeout = 5000);
+            try:
+                page = urlopen(itemLink, timeout = 10000);
+            except: 
+                print 'Waiting for URL to open'  
+                time.sleep(30);
+                page = urlopen(itemLink, timeout = 10000);
             tree = html.parse(page);
             root = tree.getroot(); 
             print 'Item link:' + itemLink;
