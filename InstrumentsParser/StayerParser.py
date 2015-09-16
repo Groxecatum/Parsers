@@ -117,7 +117,7 @@ def ParseImages(root, tree):
 
 def ParseName(root, tree):
     title = root.find_class('right_tit').pop();
-    return title.text_content().strip();
+    return title.text_content().strip().replace(';', ',');
 
 def ParseDesc(desc_div, tree):
     res = ''; 
@@ -156,7 +156,7 @@ def ParseSKU_DESC(desc_div, tree, sku_default):
                 # если артикул один - называем как есть
                 # таблица построена вертикально 
                 if IsSKU(tableArray[0][1]):                              # Если элемент справа - артикул - забираем его
-                    Result[tableArray[0][1]] = getNameStrFromVertical(tableArray); # и крепим к нему все свойства   
+                    Result[tableArray[0][1].replace(';', ',')] = getNameStrFromVertical(tableArray).replace(';', ','); # и крепим к нему все свойства   
                 else:
                     if IsSKU(tableArray[1][0]):   
                         for idx, row in enumerate(tableArray):

@@ -61,7 +61,7 @@ def getNameStrFromVertical(tableArray): # Один артикул - обходи
             for col in row:
                 pass;
             # если это последняя колонка(со значениями)
-            ResList.append(DeleteLineWraps(col.strip()));
+            ResList.append(DeleteLineWraps(col.strip().replace(';', ',')));
     return ','.join(ResList);
 
 def getNameStrFromHorizontal(row): # обходим только один ряд. кроме первого столбца - артикула
@@ -71,7 +71,7 @@ def getNameStrFromHorizontal(row): # обходим только один ряд
         if idx:    # Не значение артикула
             ColsList.append(DeleteLineWraps(col.strip()));
         #first = False; 
-    return ','.join(ColsList);         
+    return ','.join(ColsList);      
 
 def ParseSKU_DESC(desc_div, tree, sku_default):
     Result = {};
@@ -84,8 +84,8 @@ def ParseSKU_DESC(desc_div, tree, sku_default):
             if (tableArray[0][0] == u'Артикул'):
                 # если артикул один - называем как есть
                 # таблица построена вертикально 
-                if IsSKU(tableArray[0][1]):                              # Если элемент справа - артикул - забираем его
-                    Result[tableArray[0][1]] = getNameStrFromVertical(tableArray); # и крепим к нему все свойства   
+                if IsSKU(tableArray[0][1]):                                                          # Если элемент справа - артикул - забираем его                                                           
+                    Result[tableArray[0][1].replace(';', ',')] = getNameStrFromVertical(tableArray); # и крепим к нему все свойства  
                 else:
                     if IsSKU(tableArray[1][0]):   
                         for idx, row in enumerate(tableArray):
@@ -103,7 +103,7 @@ def ParseName(root, tree):
     way = way.text_content();
     way = way.replace(u'г/г', u'г-г');
     name = way.split('/');
-    return name[-1].strip();
+    return name[-1].strip().replace(';', ',');
 
 def ParseDescDiv_spec(root, tree):
     return root.get_element_by_id('specifications');
@@ -137,6 +137,7 @@ def ParseCategory(root, tree, IsMultipleSKUs): # если артикулов б�
     way = box.find_class('way').pop();
     way = way.text_content();
     way = way.replace(u'Столярно/слесарный', u'Столярно\слесарный' );
+    way = way.replace(u'дереву/металлу', u'дереву\металлу');
     wayParts = way.split('/');
     way = '';
     for wayPart in wayParts:
@@ -262,7 +263,7 @@ def ParseItems(linkLines, lock, part):
                 encodedKey = key.encode('windows-1251', errors='ignore');
                 if IsMultipleSKUs:
                     name_str = orig_name_str + '(' + SKUs_NameDesc_dict[key] + ')';
-                name_str = name_str.encode('windows-1251', errors='ignore');
+                name_str = name_str.encode('windows-1251', errors='ignore').replace(';', ',');
                 with lock:
                     #file = open(CSVFile, 'a+');
                     #try:
