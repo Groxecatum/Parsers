@@ -251,7 +251,7 @@ def ParseItems(linkLines, lock, part):
             group_str = PrettifyStr(ParseCategory(root, tree, IsMultipleSKUs));
             print 'Category:' + group_str;   
             desc_str = ParseDesc(desc_div_spec, desc_div_features, tree);
-            desc_str = DeleteLineWraps(desc_str);
+            desc_str = DeleteLineWraps(desc_str).replace(';', ',');
             #print desc_str;
             orig_name_str = name_str;
             group_str = group_str.encode('windows-1251', errors='ignore');
