@@ -38,7 +38,7 @@ def ParseCategory(root, tree, IsMultipleSKUs): # если артикулов б�
     return way;     
 
 def IsSKU(Str): #строка содержит 5+ цифр(подряд?)
-    Res = (re.search('\d', Str) != None) or (re.search('-', Str) != None); 
+    Res = (re.search('\d{2,}', Str) != None) or (re.search('-', Str) != None); 
     return Res;
 
 def DeleteSpacesFromMiddle(Str):
@@ -107,10 +107,14 @@ def savepics(imgs, itemLink):
 
 def ParseImages(root, tree):
     res = [];
-    main_image_div = root.get_element_by_id('product-core-image'); # Забираем основное фото
-    for imageLink in main_image_div.iterlinks():
-        if '.970' in imageLink[2]:
-            res.append(site_url + imageLink[2]);
+    try:
+        main_image_div = root.get_element_by_id('product-core-image'); # Забираем основное фото
+    except:
+        pass;
+    if main_image_div is not None:
+        for imageLink in main_image_div.iterlinks():
+            if '.970' in imageLink[2]:
+                res.append(site_url + imageLink[2]);
             
     resStr = ';'.join(res); 
     return resStr;
@@ -126,7 +130,7 @@ def ParseDesc(desc_div, desc_div_specs, tree):
         for child in desc_div.getchildren():
             res += html.tostring(child, encoding='utf-8').replace(';', ',');
          
-    if desc_div is not None:  
+    if desc_div_specs is not None:  
         for child in desc_div_specs.getchildren():
             res += html.tostring(child, encoding='utf-8').replace(';', ',');
     #print res;
@@ -152,10 +156,11 @@ def ParseItems(linkLines, lock, part):
             itemLink = itemLink.strip();
             try:
                 page = urlopen(site_url + itemLink, timeout = 10000);
+                tree = html.parse(page);
             except:
                 time.sleep(30);
                 page = urlopen(site_url + itemLink, timeout = 10000);
-            tree = html.parse(page);
+                tree = html.parse(page);
             root = tree.getroot(); 
             print 'Item link: ' + site_url + itemLink;
             name_str = ParseName(root, tree);
@@ -266,7 +271,7 @@ try:
     #ParseItems(items_cache.readlines(), lock, 0);
     for itemLink in items_cache.readlines():
         threadItems.append(itemLink);
-        if len(threadItems) >= 250:
+        if len(threadItems) >= 700:
             threadItems = createThread(threads, lock, threadItems);
             threadItems = []; 
     if len(threadItems):

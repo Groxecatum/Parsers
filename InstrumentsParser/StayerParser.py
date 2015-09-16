@@ -46,7 +46,7 @@ def tabletoList(tableElem):
     return tableArray;            
 
 def IsSKU(Str): #строка содержит 5+ цифр(подряд?)
-    Res = (re.search('\d', Str) != None) or (re.search('-', Str) != None); 
+    Res = (re.search('\d{2,}', Str) != None) or (re.search('-', Str) != None); 
     return Res;
 
 def DeleteSpacesFromMiddle(Str):
@@ -251,17 +251,25 @@ def CacheItems():
                             print 'MainMenu link:' + link[2];
             
         for MainMenuLink in MainMenuLinks:
-            page = urlopen(MainMenuLink, timeout = 5000);
-            tree = html.parse(page);
-            root = tree.getroot();
-            SubItems = root.find_class('z_group');
-            last_cached_link = '';
-            for SubMenuItem in SubItems:
-                for link in SubMenuItem.iterlinks():
-                    if ('item' in link[2]) and (link[2] != last_cached_link):
-                        print 'Cached:' + link[2];
-                        last_cached_link = link[2];
-                        items_cache.write(link[2] +'\n');
+            page_num = 1;
+            pages_count = 1;
+            while True and (page_num <= pages_count):
+                page = urlopen(MainMenuLink + '/page{0}'.format(page_num), timeout = 5000);
+                tree = html.parse(page);
+                root = tree.getroot();
+                SubItems = root.find_class('z_group');
+                if pages_count == 1:
+                    Pagination = root.find_class('pagination');
+                    pages_count = Pagination.iterlinks().count + 1;
+                    print 'Pages: ' + pages_count;
+                last_cached_link = '';
+                for SubMenuItem in SubItems:
+                    for link in SubMenuItem.iterlinks():
+                        if ('item' in link[2]) and (link[2] != last_cached_link):
+                            print 'Cached:' + link[2];
+                            last_cached_link = link[2];
+                            items_cache.write(link[2] +'\n');
+            page_num += 1;
                         
         items_cache.close();
     except:
@@ -280,7 +288,7 @@ try:
     #ParseItems(items_cache.readlines(), lock, 0);
     for itemLink in items_cache.readlines():
         threadItems.append(itemLink);
-        if len(threadItems) >= 250:
+        if len(threadItems) >= 500:
             threadItems = createThread(threads, lock, threadItems);
             threadItems = []; 
     if len(threadItems):
