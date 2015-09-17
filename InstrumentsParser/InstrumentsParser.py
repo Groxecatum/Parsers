@@ -115,7 +115,7 @@ def ParseImages(root, tree):
         for imageLink in main_image_div.iterlinks():
             if '.970' in imageLink[2]:
                 res.append(site_url + imageLink[2]);
-                
+                   
     resStr = ';'.join(res); 
     return resStr;
 
