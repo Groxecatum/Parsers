@@ -115,7 +115,7 @@ def ParseImages(root, tree):
         for imageLink in main_image_div.iterlinks():
             if '.970' in imageLink[2]:
                 res.append(site_url + imageLink[2]);
-                   
+            
     resStr = ';'.join(res); 
     return resStr;
 
@@ -130,7 +130,7 @@ def ParseDesc(desc_div, desc_div_specs, tree):
         for child in desc_div.getchildren():
             res += html.tostring(child, encoding='utf-8').replace(';', ',');
          
-    if desc_div_specs is not None:   
+    if desc_div_specs is not None:  
         for child in desc_div_specs.getchildren():
             res += html.tostring(child, encoding='utf-8').replace(';', ',');
     #print res;
