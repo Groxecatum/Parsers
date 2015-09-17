@@ -7,6 +7,7 @@ Created on 30 авг. 2015 г.
 '''
 import os;
 import re;
+import time;
 import threading;
 from urllib2 import urlopen;
 import lxml.html as html;
@@ -161,8 +162,8 @@ def ParseSKU_DESC(desc_div, tree, sku_default):
                     if IsSKU(tableArray[1][0]):   
                         for idx, row in enumerate(tableArray):
                             if idx:    #Не шапка
-                                cols_str = getNameStrFromHorizontal(row);
-                                Result[row[0]] = cols_str;
+                                cols_str = getNameStrFromHorizontal(row).replace(';', ',');
+                                Result[row[0].replace(';', ',')] = cols_str;
                     else: # Не нашли артикул - используем имя товара
                         Result[sku_default] = '';
                         
