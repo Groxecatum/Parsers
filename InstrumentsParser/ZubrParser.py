@@ -51,7 +51,7 @@ def tabletoList(tableElem):
     return tableArray;            
 
 def IsSKU(Str): #строка содержит 5+ цифр(подряд?)
-    Res = (re.search('\d', Str) != None) or (re.search('-', Str) != None); 
+    Res = (re.search('\d{2,}', Str) != None) or ((re.search('-', Str) != None) and (not 'Кол-во' in Str)); 
     return Res;
         
 def getNameStrFromVertical(tableArray): # Один артикул - обходим всю таблицу Кроме первого элемента - шапка
@@ -90,18 +90,27 @@ def ParseSKU_DESC(desc_div, tree, sku_default):
                     if IsSKU(tableArray[1][0]):   
                         for idx, row in enumerate(tableArray):
                             if idx:    #Не шапка
-                                cols_str = getNameStrFromHorizontal(row);
-                                Result[row[0]] = cols_str;
+                                if IsSKU(row[0]): #Иногда попадается фигня
+                                    cols_str = getNameStrFromHorizontal(row);
+                                    Result[row[0]] = cols_str;
                     else: # Не нашли артикул - используем имя товара
                         Result[sku_default] = '';
                         
     return Result;
 
+def ReplaceSpecificMatches(way):
+    way = way.replace(u'г/г', u'г-г');
+    way = way.replace(u'Столярно/слесарный', u'Столярно\слесарный' );
+    way = way.replace(u'дереву/металлу', u'дереву\металлу');
+    way = way.replace(u'1/', u'1\\');
+    way = way.replace(u'3/', u'3\\');
+    return way;
+
 def ParseName(root, tree):
     box = root.get_element_by_id('content-box');
     way = box.find_class('way').pop();
     way = way.text_content();
-    way = way.replace(u'г/г', u'г-г');
+    way = ReplaceSpecificMatches(way);
     name = way.split('/');
     return name[-1].strip().replace(';', ',');
 
@@ -136,8 +145,7 @@ def ParseCategory(root, tree, IsMultipleSKUs): # если артикулов б�
     box = root.get_element_by_id('content-box');
     way = box.find_class('way').pop();
     way = way.text_content();
-    way = way.replace(u'Столярно/слесарный', u'Столярно\слесарный' );
-    way = way.replace(u'дереву/металлу', u'дереву\металлу');
+    way = ReplaceSpecificMatches(way);
     wayParts = way.split('/');
     way = '';
     for wayPart in wayParts:

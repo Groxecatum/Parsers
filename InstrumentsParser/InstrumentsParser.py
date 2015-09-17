@@ -107,11 +107,14 @@ def savepics(imgs, itemLink):
 
 def ParseImages(root, tree):
     res = [];
-    main_image_div = root.get_element_by_id('product-core-image'); # Забираем основное фото
-    for imageLink in main_image_div.iterlinks():
-        if '.970' in imageLink[2]:
-            res.append(site_url + imageLink[2]);
-            
+    try:
+        main_image_div = root.get_element_by_id('product-core-image'); # Забираем основное фото
+    except:
+        pass;
+    if main_image_div is not None:
+        for imageLink in main_image_div.iterlinks():
+            if '.970' in imageLink[2]:
+                res.append(site_url + imageLink[2]);
     resStr = ';'.join(res); 
     return resStr;
 
@@ -126,7 +129,7 @@ def ParseDesc(desc_div, desc_div_specs, tree):
         for child in desc_div.getchildren():
             res += html.tostring(child, encoding='utf-8').replace(';', ',');
          
-    if desc_div is not None:  
+    if desc_div_specs is not None:   
         for child in desc_div_specs.getchildren():
             res += html.tostring(child, encoding='utf-8').replace(';', ',');
     #print res;
