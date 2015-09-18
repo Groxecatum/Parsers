@@ -17,8 +17,9 @@ import lxml.html as html;
 site_url='http://zubr.ru';
 #imagesDir = 'instrument_images';
 CSVFilePart = 'zubr_parse-results-part-{0}.csv';
-CACHEFile = 'itemlinks.txt';
-formatStr = '{0};{1};{2};{3};{4}\n';
+CACHEFile = 'zubr_itemlinks.txt';
+ParsedPart = 'zubr_parsed-{0}.txt';
+formatStr = '{0};{1};{2};{3};{4};{5}\n';
 maxAdditionalImages = 8;
 #-------------------------------------------------------------------   
 def DeleteSpacesFromMiddle(Str):
@@ -51,7 +52,7 @@ def tabletoList(tableElem):
     return tableArray;            
 
 def IsSKU(Str): #строка содержит 5+ цифр(подряд?)
-    Res = (re.search('\d{2,}', Str) != None) or ((re.search('-', Str) != None) and (not 'Кол-во' in Str)); 
+    Res = (re.search('\d{2,}', Str) != None) or ((re.search('-', Str) != None) and (not u'Кол-во' in Str)); 
     return Res;
         
 def getNameStrFromVertical(tableArray): # Один артикул - обходим всю таблицу Кроме первого элемента - шапка
@@ -230,7 +231,7 @@ def CacheItems():
 def ParseItems(linkLines, lock, part):
     f = open(CSVFilePart.format(part), 'w+');
     try:
-        f.write('{0};{1};{2};{3};{4};{5};{6};{7};{8};{9};{10};{11};{12}\n'.format('sku', 'name', 'desc', 'group', 'img', 'adImg1', 'adImg2', 'adImg3', 'adImg4', 'adImg5', 'adImg6', 'adImg7', 'adImg8'));
+        f.write('{0};{1};{2};{3};{4};{5};{6};{7};{8};{9};{10};{11};{12};{13}\n'.format('sku', 'name', 'desc', 'group', 'manufacturer', 'img', 'adImg1', 'adImg2', 'adImg3', 'adImg4', 'adImg5', 'adImg6', 'adImg7', 'adImg8'));
         for itemLink in linkLines:
             try:
                 page = urlopen(site_url + itemLink, timeout = 10000);
@@ -273,16 +274,12 @@ def ParseItems(linkLines, lock, part):
                     name_str = orig_name_str + '(' + SKUs_NameDesc_dict[key] + ')';
                 name_str = name_str.encode('windows-1251', errors='ignore').replace(';', ',');
                 with lock:
-                    #file = open(CSVFile, 'a+');
-                    #try:
                     f.write(formatStr.format(encodedKey, 
                                                 name_str, 
                                                 desc_str,
                                                 group_str, 
+                                                'ЗУБР',
                                                 img_str));  
-                    #finally:
-                        #file.close();
-            #time.sleep(5);
     finally:
         f.close();
         

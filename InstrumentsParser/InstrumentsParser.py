@@ -9,6 +9,7 @@ import os;
 import re;
 import threading;
 import time;
+import sys;
 from urllib2 import urlopen;
 import lxml.html as html;
 
@@ -17,6 +18,7 @@ site_url = 'http://instrument.ru';
 pages_ended_str = u'В этой категории нет ни одного товара.';
 pages_ended_str2 = u'Не найдено ни одного товара.'
 CSVFilePart = 'instrument_parse-results-part-{0}.csv';
+ParsedPart = 'instrument_parsed-{0}.txt';
 CACHEFile = 'itemlinks_instrument.txt';
 formatStr = '{0};{1};{2};{3};{4}\n';
 maxAdditionalImages = 8;
@@ -92,6 +94,7 @@ def savepics(imgs, itemLink):
                 except: 
                     time.sleep(30);
                     resource = urlopen(img, timeout = 10000);
+                    print '=============================================================================================' + sys.exc_info()[0]
                 out = open(imagename, 'wb');
                 try:
                     out.write(resource.read());
@@ -107,6 +110,7 @@ def savepics(imgs, itemLink):
 
 def ParseImages(root, tree):
     res = [];
+    main_image_div = None;
     try:
         main_image_div = root.get_element_by_id('product-core-image'); # Забираем основное фото
     except:
@@ -141,32 +145,56 @@ def ParseSKU_DESC(desc_div, tree, sku_default):
     root = tree.getroot();
     # Парсим артикул - он у них отдельно
     cart_form = root.get_element_by_id('cart-form');
-    sku_span = cart_form.xpath('./div/span').pop();
+    try:
+        sku_span = cart_form.xpath('./div/span').pop();
+    except:
+        sku_span = cart_form.find_class('hint').pop();
     if sku_span is not None:
         Result[sku_span.text_content().strip()] = '';  
     if len(Result) == 0:
         Result[sku_default] = '';                     
     return Result;
 
+def GetLastLink(part):
+    last_link = '';
+    if os.path.exists(ParsedPart.format(part)):
+        done_file = open(ParsedPart.format(part), 'r+', 0);
+        try:
+            lines = done_file.readlines();
+            if lines.count > 0: 
+                last_link = lines[-1]; 
+        except:
+            pass; 
+        done_file.close();
+    return last_link.strip();
+
 def ParseItems(linkLines, lock, part):
-    res_file = open(CSVFilePart.format(part), 'w+', 0);
+    ResFileExisted = os.path.exists(CSVFilePart.format(part));
+    last_link = GetLastLink(part);
+    res_file = open(CSVFilePart.format(part), 'a+', 0);
+    done_file = open(ParsedPart.format(part), 'a+', 0);
     try:
-        res_file.write('{0};{1};{2};{3};{4}\n'.format('sku', 'name', 'desc', 'group', 'img'));
+        if not ResFileExisted: 
+            res_file.write('{0};{1};{2};{3};{4}\n'.format('sku', 'name', 'desc', 'group', 'img'));
         for itemLink in linkLines:
             itemLink = itemLink.strip();
+            if (last_link != '') and (last_link != itemLink):
+                continue;
+            last_link = ''; # Что бы крутилось дальше
+            print 'Opening: ' + site_url + itemLink;
             try:
                 page = urlopen(site_url + itemLink, timeout = 10000);
                 tree = html.parse(page);
-            except:
+            except BaseException:
                 time.sleep(30);
                 page = urlopen(site_url + itemLink, timeout = 10000);
                 tree = html.parse(page);
+                print '=============================================================================================' + sys.exc_info()[0] 
             root = tree.getroot(); 
-            print 'Item link: ' + site_url + itemLink;
             name_str = ParseName(root, tree);
             print 'Name: ' + name_str;
             img_str = ParseImages(root, tree).strip();
-            print 'Images links:' + img_str;
+            print 'Images links: ' + img_str;
             if img_str != '':
                 img_str = savepics(img_str, itemLink);
                 
@@ -199,8 +227,11 @@ def ParseItems(linkLines, lock, part):
                                         desc_str,
                                         group_str, 
                                         img_str)); 
+            done_file.write(itemLink + '\n');
     finally:
-        res_file.close();
+        done_file.close();
+        res_file.close();  
+        
 
 def createThread(threads, lock, threadItems):
     t = threading.Thread(target=ParseItems, args=(threadItems[:], lock, len(threads))); 
@@ -271,7 +302,7 @@ try:
     #ParseItems(items_cache.readlines(), lock, 0);
     for itemLink in items_cache.readlines():
         threadItems.append(itemLink);
-        if len(threadItems) >= 700:
+        if len(threadItems) >= 1000:
             threadItems = createThread(threads, lock, threadItems);
             threadItems = []; 
     if len(threadItems):

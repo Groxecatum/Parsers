@@ -16,7 +16,8 @@ import lxml.html as html;
 site_url = 'http://www.stayer-tools.com';
 CSVFilePart = 'stayer_parse-results-part-{0}.csv';
 CACHEFile = 'itemlinks_stayer.txt';
-formatStr = '{0};{1};{2};{3};{4}\n';
+ParsedPart = 'stayer_parsed-{0}.txt';
+formatStr = '{0};{1};{2};{3};{4};{5}\n';
 maxAdditionalImages = 8;
 #===================================================================================================================
 def ParseCategory(root, tree, IsMultipleSKUs): # если артикулов больше одного - тогда название входит как название группы
@@ -169,12 +170,33 @@ def ParseSKU_DESC(desc_div, tree, sku_default):
                         
     return Result;
 
+def GetLastLink(part):
+    last_link = '';
+    if os.path.exists(ParsedPart.format(part)):
+        done_file = open(ParsedPart.format(part), 'r+', 0);
+        try:
+            lines = done_file.readlines();
+            if lines.count > 0: 
+                last_link = lines[-1]; 
+        except:
+            pass; 
+        done_file.close();
+    return last_link.strip();
+
 def ParseItems(linkLines, lock, part):
-    res_file = open(CSVFilePart.format(part), 'w+', 0);
+    ResFileExisted = os.path.exists(CSVFilePart.format(part));
+    last_link = GetLastLink(part);
+    res_file = open(CSVFilePart.format(part), 'a+', 0);
+    done_file = open(ParsedPart.format(part), 'a+', 0);
     try:
-        res_file.write('{0};{1};{2};{3};{4};{5};{6};{7};{8};{9};{10};{11};{12}\n'.format('sku', 'name', 'desc', 'group', 'img', 'adImg1', 'adImg2', 'adImg3', 'adImg4', 'adImg5', 'adImg6', 'adImg7', 'adImg8'));
+        if not ResFileExisted: 
+            res_file.write('{0};{1};{2};{3};{4};{5};{6};{7};{8};{9};{10};{11};{12};{13}\n'.format('sku', 'name', 'desc', 'group', 'manufacturer', 'img', 'adImg1', 'adImg2', 'adImg3', 'adImg4', 'adImg5', 'adImg6', 'adImg7', 'adImg8'));
         for itemLink in linkLines:
             itemLink = itemLink.strip();
+            if (last_link != '') and (last_link != itemLink):
+                continue;
+            last_link = ''; # Что бы крутилось дальше
+            print 'Opening: ' + itemLink;
             try:
                 page = urlopen(itemLink, timeout = 10000);
                 tree = html.parse(page);
@@ -184,7 +206,6 @@ def ParseItems(linkLines, lock, part):
                 page = urlopen(itemLink, timeout = 10000);
                 tree = html.parse(page);
             root = tree.getroot(); 
-            print 'Item link:' + itemLink;
             name_str = ParseName(root, tree);
             print 'Name:' + name_str;
             img_str = ParseImages(root, tree).strip();
@@ -218,9 +239,12 @@ def ParseItems(linkLines, lock, part):
                 res_file.write(formatStr.format(encodedKey, 
                                         name_str, 
                                         desc_str,
-                                        group_str, 
-                                        img_str));  
+                                        group_str,
+                                        'STAYER', 
+                                        img_str)); 
+            done_file.write(itemLink + '\n'); 
     finally:
+        done_file.close();
         res_file.close();
 
 def createThread(threads, lock, threadItems):
@@ -256,14 +280,18 @@ def CacheItems():
             page_num = 1;
             pages_count = 1;
             while True and (page_num <= pages_count):
-                page = urlopen(MainMenuLink + '/page{0}'.format(page_num), timeout = 5000);
+                page = urlopen(MainMenuLink + 'page{0}'.format(page_num), timeout = 5000);
                 tree = html.parse(page);
                 root = tree.getroot();
                 SubItems = root.find_class('z_group');
-                if pages_count == 1:
-                    Pagination = root.find_class('pagination');
-                    pages_count = Pagination.iterlinks().count + 1;
-                    print 'Pages: ' + pages_count;
+                if page_num == 1:
+                    paginations = root.find_class('pagination');
+                    if paginations:
+                        pagination_div = paginations.pop();
+                        pages_count = 1;
+                        for link in pagination_div.iterlinks():
+                            pages_count += 1;
+                        print 'Pages: ' + str(pages_count);
                 last_cached_link = '';
                 for SubMenuItem in SubItems:
                     for link in SubMenuItem.iterlinks():
@@ -271,7 +299,7 @@ def CacheItems():
                             print 'Cached:' + link[2];
                             last_cached_link = link[2];
                             items_cache.write(link[2] +'\n');
-            page_num += 1;
+                page_num += 1;
                         
         items_cache.close();
     except:
@@ -290,7 +318,7 @@ try:
     #ParseItems(items_cache.readlines(), lock, 0);
     for itemLink in items_cache.readlines():
         threadItems.append(itemLink);
-        if len(threadItems) >= 500:
+        if len(threadItems) >= 1000:
             threadItems = createThread(threads, lock, threadItems);
             threadItems = []; 
     if len(threadItems):
