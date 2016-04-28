@@ -1,45 +1,61 @@
-# -*- coding: utf-8 -*- 
+# -*- coding: UTF-8 -*- 
 
-'''
-Created on 30 авг. 2015 �.
-
-@author: Grey
-'''
+from __future__ import unicode_literals;
 import os;
 import re;
 import threading;
 import time;
 import sys;
-from urllib2 import urlopen;
+import urllib2;
 import lxml.html as html;
-from nt import lstat
+import unicodedata;
 
 #===================================================================================================================
 site_url = 'http://10kor.ru';
 pages_ended_str = u'В этой категории нет ни одного товара.';
 pages_ended_str2 = u'Не найдено ни одного товара.'
 CSVFilePart = '10kor_parse-results-part-{0}.csv';
+reviews_file_part = '10kor_reviews_part-{0}.txt';
 ParsedPart = '10kor_parsed-{0}.txt';
 CACHEFile = 'itemlinks_10kor.txt';
 reviews_SQL = '10kor_reviews_SQL';
 formatStr = '{0};{1};{2};{3};{4}\n';
 maxAdditionalImages = 8;
 #===================================================================================================================
-def ParseCategory(root, tree, IsMultipleSKUs): # если артикулов больше одного - тогда название входит как название группы
-    way = root.find_class('breadcrumbs').pop();
-    way = way.text_content();
-    wayParts = way.split(u'→');
-    wayParts.remove(wayParts[0]);
-    wayParts.remove(wayParts[-1]);
-    way = '';
-    for wayPart in wayParts:
-        wayPart = PrettifyStr(wayPart.strip());
-        not_last_part_of_singlesku = wayPart != PrettifyStr(wayParts[-1].strip()); 
-        #if wayPart != PrettifyStr(wayParts[-1]):   
-        way += wayPart;
-        if not_last_part_of_singlesku:
-            way += '|';
-    return way;     
+
+def ParseAndPlaceReviews(root, part, Name):
+    reviews_file = open(reviews_file_part.format(part), 'a+', 0);
+    try:
+        reviews = root.find_class('respond');
+        for review in reviews:
+            username_elem = review.xpath('//strong')[0];
+            review_name_date = username_elem.text_content().split(',');
+            stars_bar_div = review.find_class('stars-bar-active').pop();
+            review_rating = stars_bar_div.attrib['style'][7:-1];
+            review_text_elem = review.xpath('//em')[0];
+            review_text = unicode(html.tostring(review_text_elem));
+            
+            review_text = Encode(review_text);
+            review_rating = Encode(review_rating);
+            review_name_date[1] = str(review_name_date[1]);
+            review_name_date[0] = review_name_date[0].encode('windows-1251', 'ignore');
+            FieldsStr = review_name_date[0] + ', ' +  review_text + ', ' + review_rating + ', ' + str(1) + ', ' + review_name_date[1]  + ', ' +  review_name_date[1];
+            
+            reviews_file.write('INSERT INTO oc_reviews(review_id, product_id, customer_id, author, text, rating, status, date_added, date_modified) VALUES({0})'.format(FieldsStr));    
+    finally:
+        reviews_file.close();
+    
+    return True;
+
+def ParseCategory(root): # если артикулов больше одного - тогда название входит как название группы
+    way = root.find_class('breadcrumb').pop();
+    category = way.text_content();
+    #for part in way.getchildren():
+        #category = part.text_content(); 
+        #if (part.tag == 'a'):
+            #category = part.attrib['title'];
+    #category = category;
+    return category.replace('/', '|');
 
 def IsSKU(Str): #строка содержит 5+ цифр(подряд?)
     Res = (re.search('\d{2,}', Str) != None) or (re.search('-', Str) != None); 
@@ -63,7 +79,10 @@ def PrettifyStr(Str):
     Str = DeleteSpacesFromMiddle(Str);
     return Str;
 
-def ParseDescElement(root, tree):
+def Encode(ustr):
+    return ustr.decode('utf-8', 'ignore').encode('windows-1251', 'ignore');
+
+def ParseDescElement(root):
     wrapper = root.find_class('detail-wrapper').pop();
     try:
         elem = wrapper.xpath("//div[@itemprop='description']")[0];
@@ -71,9 +90,9 @@ def ParseDescElement(root, tree):
         elem = None;
     return elem;
 
-def ParseSpecsElement(root, tree):
+def ParseSpecsElements(root):
     try:
-        elem = root.get_element_by_id('product-features');
+        elem = root.find_class('atr');
     except KeyError:
         elem = None;
     return elem;
@@ -111,7 +130,7 @@ def savepics(imgs, itemLink):
             
     return ';'.join(saved_imgs);
 
-def ParseImages(root, tree):
+def ParseImages(root):
     res = [];
     main_image_div = None;
     try:
@@ -126,35 +145,27 @@ def ParseImages(root, tree):
     resStr = ';'.join(res); 
     return resStr;
 
-def ParseName(root, tree):
+def ParseName(root):
     right_col = root.find_class('col-right').pop();
     return right_col.xpath("//h1[@itemprop='name']/text()")[0]; #/h1[@itemprop='name']/text()"
 
-def ParseDesc(desc_div, desc_div_specs, tree):
+def ParseDesc(desc_div):
     res = '';
     if desc_div is not None:  
         for child in desc_div.getchildren():
-            res += html.tostring(child, encoding='utf-8').replace(';', ',');
-         
-    if desc_div_specs is not None:  
-        for child in desc_div_specs.getchildren():
-            res += html.tostring(child, encoding='utf-8').replace(';', ',');
+            res += html.tostring(child).replace(';', ',');
+            
     #print res;
     return res;
 
-def ParseSKU(desc_div, tree, sku_default):
-    Result = {};
-    root = tree.getroot();
-    # Парсим артикул - он у них отдельно
-    cart_form = root.get_element_by_id('cart-form');
-    try:
-        sku_span = cart_form.xpath('./div/span').pop();
-    except:
-        sku_span = cart_form.find_class('hint').pop();
-    if sku_span is not None:
-        Result[sku_span.text_content().strip()] = '';  
-    if len(Result) == 0:
-        Result[sku_default] = '';                     
+def ParseSKU(specs_divs, sku_default):
+    Result = 0;
+    for specs_div in specs_divs:
+        text = specs_div.text_content();
+        name = u'Артикул: ';
+        if name in text:
+            Result = text.replace(name, '');
+            break;                    
     return Result;
 
 def GetLastLink(part):
@@ -184,51 +195,45 @@ def ParseItems(linkLines, lock, part):
                 continue;
             last_link = ''; # Что бы крутилось дальше
             print 'Opening: ' + site_url + itemLink;
-            try:
-                page = urlopen(site_url + itemLink, timeout = 10000);
-                tree = html.parse(page);
-            except BaseException:
-                time.sleep(30);
-                page = urlopen(site_url + itemLink, timeout = 10000);
-                tree = html.parse(page);
-                print '=============================================================================================' + sys.exc_info()[0] 
-            root = tree.getroot(); 
-            name_str = ParseName(root, tree);
+
+                #page = urlopen(site_url + itemLink, timeout = 10000);
+            request = urllib2.Request(site_url + itemLink);
+            request.add_header('User-Agent', 'Mozilla/5.0 (Windows NT 9.1; rv:10.0) Gecko/20151031 Firefox/40.0'); 
+            opener = urllib2.build_opener();                                   
+            page = opener.open(request).read();
+            root = html.fromstring(page);
+            
+            name_str = ParseName(root);
             print 'Name: ' + name_str;
-            img_str = ParseImages(root, tree).strip();
+            img_str = ParseImages(root).strip();
             print 'Images links: ' + img_str;
             if img_str != '':
                 img_str = savepics(img_str, itemLink);
                 
             print 'Images paths:' + img_str;    
-            desc_div = ParseDescElement(root, tree);
-            desc_div_specs = ParseSpecsElement(root, tree);    
+            desc_div = ParseDescElement(root);
+            div_specs = ParseSpecsElements(root);    
             
             # основная операция
-            SKUs_NameDesc_dict = ParseSKU(desc_div_specs, tree, name_str);
+            SKU = ParseSKU(div_specs, name_str);
             
-            IsMultipleSKUs = False; # Здесь только одиночные артикулы. Но что бы не рушить логику ниже - проще просто переназначить.
-            
-            group_str = PrettifyStr(ParseCategory(root, tree, IsMultipleSKUs));
+            group_str = ParseCategory(root);
             print 'Category:' + group_str;   
-            desc_str = PrettifyStr(ParseDesc(desc_div, desc_div_specs, tree));
+            desc_str = ParseDesc(desc_div);
+            ParseAndPlaceReviews(root, part, name_str);
             #print desc_str;
-            orig_name_str = name_str;
             group_str = group_str.encode('windows-1251', errors='ignore');
-            desc_str = desc_str.decode('utf-8').encode('windows-1251', errors='ignore'); 
+            desc_str = desc_str.encode('windows-1251', errors='ignore'); 
             img_str = img_str.encode('windows-1251', errors='ignore');
-            for key in SKUs_NameDesc_dict:
-                name_str = orig_name_str;
-                encodedKey = key.encode('windows-1251', errors='ignore');
-                if IsMultipleSKUs:
-                    name_str = orig_name_str + '(' + SKUs_NameDesc_dict[key] + ')';
-                name_str = name_str.encode('windows-1251', errors='ignore');
-                #with lock:
-                res_file.write(formatStr.format(encodedKey, 
-                                        name_str, 
-                                        desc_str,
-                                        group_str, 
-                                        img_str)); 
+            encodedKey = SKU.encode('windows-1251', errors='ignore');
+            name_str = name_str.encode('windows-1251', errors='ignore');
+            
+            res_file.write(formatStr.format(encodedKey, 
+                                    name_str, 
+                                    desc_str,
+                                    group_str, 
+                                    img_str));
+                                     
             done_file.write(itemLink + '\n');
     finally:
         done_file.close();
