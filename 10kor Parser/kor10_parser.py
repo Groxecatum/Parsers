@@ -1,6 +1,6 @@
 # -*- coding: UTF-8 -*- 
 
-from __future__ import unicode_literals;
+#from __future__ import unicode_literals;
 import os;
 import re;
 import threading;
@@ -8,7 +8,6 @@ import time;
 import sys;
 import urllib2;
 import lxml.html as html;
-import unicodedata;
 
 #===================================================================================================================
 site_url = 'http://10kor.ru';
@@ -19,7 +18,7 @@ reviews_file_part = '10kor_reviews_part-{0}.txt';
 ParsedPart = '10kor_parsed-{0}.txt';
 CACHEFile = 'itemlinks_10kor.txt';
 reviews_SQL = '10kor_reviews_SQL';
-formatStr = '{0};{1};{2};{3};{4}\n';
+formatStr = u"{0}~{1}~{2}~{3}~{4}\n";
 maxAdditionalImages = 8;
 #===================================================================================================================
 
@@ -30,18 +29,17 @@ def ParseAndPlaceReviews(root, part, Name):
         for review in reviews:
             username_elem = review.xpath('//strong')[0];
             review_name_date = username_elem.text_content().split(',');
-            stars_bar_div = review.find_class('stars-bar-active').pop();
-            review_rating = stars_bar_div.attrib['style'][7:-1];
+            review_rating = '100';
+            stars_bar_div = review.find_class('stars-bar-active');
+            if stars_bar_div:
+                stars_bar_div = review.find_class('stars-bar-active').pop();  
+                review_rating = unicode(stars_bar_div.attrib['style'][7:-1]);
             review_text_elem = review.xpath('//em')[0];
-            review_text = unicode(html.tostring(review_text_elem));
+            review_text = html.tostring(review_text_elem, encoding='UTF-8').decode('utf-8', 'ignore');
             
-            review_text = Encode(review_text);
-            review_rating = Encode(review_rating);
-            review_name_date[1] = str(review_name_date[1]);
-            review_name_date[0] = review_name_date[0].encode('windows-1251', 'ignore');
             FieldsStr = review_name_date[0] + ', ' +  review_text + ', ' + review_rating + ', ' + str(1) + ', ' + review_name_date[1]  + ', ' +  review_name_date[1];
-            
-            reviews_file.write('INSERT INTO oc_reviews(review_id, product_id, customer_id, author, text, rating, status, date_added, date_modified) VALUES({0})'.format(FieldsStr));    
+            reviews_file.write((Name + u'\n').encode('utf-8', 'ignore'));
+            reviews_file.write(u'INSERT INTO oc_reviews(review_id, product_id, customer_id, author, text, rating, status, date_added, date_modified) VALUES({0});\n'.format(FieldsStr).encode('utf-8', 'ignore'));    
     finally:
         reviews_file.close();
     
@@ -55,6 +53,9 @@ def ParseCategory(root): # если артикулов больше одного
         #if (part.tag == 'a'):
             #category = part.attrib['title'];
     #category = category;
+    category = category.replace(' / ', '|');
+    category = category.replace('/ ', '|');
+    category = category.replace(' /', '|');
     return category.replace('/', '|');
 
 def IsSKU(Str): #строка содержит 5+ цифр(подряд?)
@@ -105,17 +106,17 @@ def savepics(imgs, itemLink):
     saved_imgs = [];
     if not os.path.exists(fullPath):
         os.makedirs(fullPath);
-    for img in imgs.split(';'):
+    for img in imgs.split('~'):
         if img != '':
             imagename = "{0}\\{1}".format(fullPath, img.split('/')[-1]);
             saved_imgs.append(imagename.replace('\\', '/'));
             if not os.path.exists(imagename):
                 print 'Opening image: ' + img;
                 try:
-                    resource = urlopen(img, timeout = 10000);
+                    resource = urllib2.urlopen(img, timeout = 10000);
                 except: 
                     time.sleep(30);
-                    resource = urlopen(img, timeout = 10000);
+                    resource = urllib2.urlopen(img, timeout = 10000);
                     print '=============================================================================================' + sys.exc_info()[0]
                 out = open(imagename, 'wb');
                 try:
@@ -128,7 +129,7 @@ def savepics(imgs, itemLink):
         else:
             saved_imgs.append(''); 
             
-    return ';'.join(saved_imgs);
+    return u'~'.join(saved_imgs);
 
 def ParseImages(root):
     res = [];
@@ -142,7 +143,7 @@ def ParseImages(root):
             if '/upload/iblock/' in imageLink[2]:
                 res.append(site_url + imageLink[2]);
             
-    resStr = ';'.join(res); 
+    resStr = '~'.join(res); 
     return resStr;
 
 def ParseName(root):
@@ -153,9 +154,8 @@ def ParseDesc(desc_div):
     res = '';
     if desc_div is not None:  
         for child in desc_div.getchildren():
-            res += html.tostring(child).replace(';', ',');
+            res += html.tostring(child, encoding='UTF-8');
             
-    #print res;
     return res;
 
 def ParseSKU(specs_divs, sku_default):
@@ -188,7 +188,7 @@ def ParseItems(linkLines, lock, part):
     done_file = open(ParsedPart.format(part), 'a+', 0);
     try:
         if not ResFileExisted: 
-            res_file.write('{0};{1};{2};{3};{4}\n'.format('sku', 'name', 'desc', 'group', 'img'));
+            res_file.write('{0}~{1}~{2}~{3}~{4}\n'.format('sku', 'name', 'desc', 'group', 'img'));
         for itemLink in linkLines:
             itemLink = itemLink.strip();
             if (last_link != '') and (last_link != itemLink):
@@ -219,20 +219,16 @@ def ParseItems(linkLines, lock, part):
             
             group_str = ParseCategory(root);
             print 'Category:' + group_str;   
-            desc_str = ParseDesc(desc_div);
+            desc_str = PrettifyStr(ParseDesc(desc_div)).decode('utf-8', 'ignore');
             ParseAndPlaceReviews(root, part, name_str);
             #print desc_str;
-            group_str = group_str.encode('windows-1251', errors='ignore');
-            desc_str = desc_str.encode('windows-1251', errors='ignore'); 
-            img_str = img_str.encode('windows-1251', errors='ignore');
-            encodedKey = SKU.encode('windows-1251', errors='ignore');
-            name_str = name_str.encode('windows-1251', errors='ignore');
-            
-            res_file.write(formatStr.format(encodedKey, 
+            Overall_Str = formatStr.format(SKU, 
                                     name_str, 
                                     desc_str,
                                     group_str, 
-                                    img_str));
+                                    img_str);
+            Overall_Str = Overall_Str.encode('utf-8', 'ignore');
+            res_file.write(Overall_Str);
                                      
             done_file.write(itemLink + '\n');
     finally:
@@ -253,7 +249,7 @@ def CacheItems():
         MainMenuLinks = [];
         #if not os.path.exists(imagesDir):
             #os.makedirs(imagesDir);
-        page = urlopen(site_url + '/catalog');
+        page = urllib2.urlopen(site_url + '/catalog');
         tree = html.parse(page);
         root = tree.getroot();
         catalog_elem = root.get_element_by_id('catalog');
@@ -264,8 +260,6 @@ def CacheItems():
             #парсим категории
             if (MainMenuItems is not None) and (MainMenuItems.tag == 'ul'): 
                 for MainMenuItem in MainMenuItems:
-                    #print MainMenuItem;
-                    #print tostring(MainMenuItem);
                     for link in MainMenuItem.iterlinks():
                         if 'catalog' in link[2]:
                             MainMenuLinks.append(link[2]);
@@ -279,7 +273,7 @@ def CacheItems():
             while not ItemsEnded:
                 try:
                     print 'Opening: ' + site_url + MainMenuLink + '?PAGEN_1={0}'.format(page_num);
-                    page = urlopen(site_url + MainMenuLink + '?PAGEN_1={0}'.format(page_num), timeout = 10000);
+                    page = urllib2.urlopen(site_url + MainMenuLink + '?PAGEN_1={0}'.format(page_num), timeout = 10000);
                     tree = html.parse(page);
                     root = tree.getroot();
                     lst = root.find_class('product-list').pop();
