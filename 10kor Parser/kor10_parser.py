@@ -276,22 +276,26 @@ def CacheItems():
                     page = urllib2.urlopen(site_url + MainMenuLink + '?PAGEN_1={0}'.format(page_num), timeout = 10000);
                     tree = html.parse(page);
                     root = tree.getroot();
-                    lst = root.find_class('product-list').pop();
-                    ItemsEnded = True;
-                    for link in lst.iterlinks():
-                        if re.search('^/catalog/[A-Za-z_0-9]+/[A-Za-z_0-9]+/$', link[2]):
-                            if not First_stored:
-                                First_item = link[2];
-                                First_stored = True;
-                            if (page_num != 1) and (First_item == link[2]):
-                                ItemsEnded = True;
-                                break;
-                            else: 
-                                ItemsEnded = False;
-                            print 'Cached:' + link[2];
-                            items_cache.write(link[2] +'\n'); 
+                    if not root.find_class('errortext'):
+                        lst = root.find_class('product-list').pop();
+                        ItemsEnded = True;
+                        for link in lst.iterlinks():
+                            if re.search('^/catalog/[A-Za-z_0-9]+/[A-Za-z_0-9]+/$', link[2]):
+                                if not First_stored:
+                                    First_item = link[2];
+                                    First_stored = True;
+                                if (page_num != 1) and (First_item == link[2]):
+                                    ItemsEnded = True;
+                                    break;
+                                else: 
+                                    ItemsEnded = False;
+                                print 'Cached:' + link[2];
+                                items_cache.write(link[2] +'\n');
+                    else:
+                        ItemsEnded = True; 
                 except:
                     print site_url + MainMenuLink + '?PAGEN_1={0}'.format(page_num) + ' is broken!!!';
+                    page_num += 1;
                     continue;
                 
                 page_num += 1;        
