@@ -18,7 +18,7 @@ reviews_file_part = '10kor_reviews_part-{0}.txt';
 ParsedPart = '10kor_parsed-{0}.txt';
 CACHEFile = 'itemlinks_10kor.txt';
 reviews_SQL = '10kor_reviews_SQL';
-formatStr = u"{0}~{1}~{2}~{3}~{4}\n";
+formatStr = u"{0}^{1}^{2}^{3}^{4}^{5}\n";
 maxAdditionalImages = 8;
 #===================================================================================================================
 
@@ -106,7 +106,7 @@ def savepics(imgs, itemLink):
     saved_imgs = [];
     if not os.path.exists(fullPath):
         os.makedirs(fullPath);
-    for img in imgs.split('~'):
+    for img in imgs.split('^'):
         if img != '':
             imagename = "{0}\\{1}".format(fullPath, img.split('/')[-1]);
             saved_imgs.append(imagename.replace('\\', '/'));
@@ -129,7 +129,7 @@ def savepics(imgs, itemLink):
         else:
             saved_imgs.append(''); 
             
-    return u'~'.join(saved_imgs);
+    return u'^'.join(saved_imgs);
 
 def ParseImages(root):
     res = [];
@@ -143,7 +143,7 @@ def ParseImages(root):
             if '/upload/iblock/' in imageLink[2]:
                 res.append(site_url + imageLink[2]);
             
-    resStr = '~'.join(res); 
+    resStr = '^'.join(res); 
     return resStr;
 
 def ParseName(root):
@@ -181,6 +181,11 @@ def GetLastLink(part):
         done_file.close();
     return last_link.strip();
 
+def ParsePrice(root):
+    price_class = root.find_class('price').pop();
+    price_text = price_class.text_content().replace(u' руб', '');
+    return price_text;
+
 def ParseItems(linkLines, lock, part):
     ResFileExisted = os.path.exists(CSVFilePart.format(part));
     last_link = GetLastLink(part);
@@ -188,7 +193,7 @@ def ParseItems(linkLines, lock, part):
     done_file = open(ParsedPart.format(part), 'a+', 0);
     try:
         if not ResFileExisted: 
-            res_file.write('{0}~{1}~{2}~{3}~{4}\n'.format('sku', 'name', 'desc', 'group', 'img'));
+            res_file.write('{0}^{1}^{2}^{3}^{4}^{5}^{6}^{7}\n'.format('sku', 'name', 'desc', 'group', 'price', 'img', 'img1', 'img2', 'img3'));
         for itemLink in linkLines:
             itemLink = itemLink.strip();
             if (last_link != '') and (last_link != itemLink):
@@ -218,14 +223,17 @@ def ParseItems(linkLines, lock, part):
             SKU = ParseSKU(div_specs, name_str);
             
             group_str = ParseCategory(root);
-            print 'Category:' + group_str;   
+            print 'Category: ' + group_str;
+            price = ParsePrice(root); 
+            print 'Price: ' + price;  
             desc_str = PrettifyStr(ParseDesc(desc_div)).decode('utf-8', 'ignore');
             ParseAndPlaceReviews(root, part, name_str);
             #print desc_str;
             Overall_Str = formatStr.format(SKU, 
                                     name_str, 
                                     desc_str,
-                                    group_str, 
+                                    group_str,
+                                    price, 
                                     img_str);
             Overall_Str = Overall_Str.encode('utf-8', 'ignore');
             res_file.write(Overall_Str);
