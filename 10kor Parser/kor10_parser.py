@@ -133,6 +133,7 @@ def savepics(imgs, itemLink):
 
 def ParseImages(root):
     res = [];
+    max_img_count = 4;
     main_image_div = None;
     try:
         main_image_div = root.find_class('photo').pop(); # Забираем основное фото
@@ -142,7 +143,8 @@ def ParseImages(root):
         for imageLink in main_image_div.iterlinks():
             if '/upload/iblock/' in imageLink[2]:
                 res.append(site_url + imageLink[2]);
-            
+    while res.length() < max_img_count:
+        res.append('');        
     resStr = '^'.join(res); 
     return resStr;
 
@@ -207,38 +209,38 @@ def ParseItems(linkLines, lock, part):
             opener = urllib2.build_opener();                                   
             page = opener.open(request).read();
             root = html.fromstring(page);
-            
-            name_str = ParseName(root);
-            print 'Name: ' + name_str;
-            img_str = ParseImages(root).strip();
-            print 'Images links: ' + img_str;
-            if img_str != '':
-                img_str = savepics(img_str, itemLink);
+            if not root.find_class('errortext'):
+                name_str = ParseName(root);
+                print 'Name: ' + name_str;
+                img_str = ParseImages(root).strip();
+                print 'Images links: ' + img_str;
+                if img_str != '':
+                    img_str = savepics(img_str, itemLink);
+                    
+                print 'Images paths:' + img_str;    
+                desc_div = ParseDescElement(root);
+                div_specs = ParseSpecsElements(root);    
                 
-            print 'Images paths:' + img_str;    
-            desc_div = ParseDescElement(root);
-            div_specs = ParseSpecsElements(root);    
-            
-            # основная операция
-            SKU = ParseSKU(div_specs, name_str);
-            
-            group_str = ParseCategory(root);
-            print 'Category: ' + group_str;
-            price = ParsePrice(root); 
-            print 'Price: ' + price;  
-            desc_str = PrettifyStr(ParseDesc(desc_div)).decode('utf-8', 'ignore');
-            ParseAndPlaceReviews(root, part, name_str);
-            #print desc_str;
-            Overall_Str = formatStr.format(SKU, 
-                                    name_str, 
-                                    desc_str,
-                                    group_str,
-                                    price, 
-                                    img_str);
-            Overall_Str = Overall_Str.encode('utf-8', 'ignore');
-            res_file.write(Overall_Str);
-                                     
-            done_file.write(itemLink + '\n');
+                # основная операция
+                SKU = ParseSKU(div_specs, name_str);
+                
+                group_str = ParseCategory(root);
+                print 'Category: ' + group_str;
+                price = PrettifyStr(ParsePrice(root)); 
+                print 'Price: ' + price;  
+                desc_str = PrettifyStr(ParseDesc(desc_div)).decode('utf-8', 'ignore');
+                ParseAndPlaceReviews(root, part, name_str);
+                #print desc_str;
+                Overall_Str = formatStr.format(SKU, 
+                                        name_str, 
+                                        desc_str,
+                                        group_str,
+                                        price, 
+                                        img_str);
+                Overall_Str = Overall_Str.encode('utf-8', 'ignore');
+                res_file.write(Overall_Str);
+                                         
+                done_file.write(itemLink + '\n');
     finally:
         done_file.close();
         res_file.close();  
@@ -324,7 +326,7 @@ try:
     #ParseItems(items_cache.readlines(), lock, 0);
     for itemLink in items_cache.readlines():
         threadItems.append(itemLink);
-        if len(threadItems) >= 5000:
+        if len(threadItems) >= 1000:
             threadItems = createThread(threads, lock, threadItems);
             threadItems = []; 
     if len(threadItems):
