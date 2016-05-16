@@ -35,11 +35,11 @@ def ParseAndPlaceReviews(root, part, Name):
                 stars_bar_div = review.find_class('stars-bar-active').pop();  
                 review_rating = unicode(stars_bar_div.attrib['style'][7:-1]);
             review_text_elem = review.xpath('//em')[0];
-            review_text = html.tostring(review_text_elem, encoding='UTF-8').decode('utf-8', 'ignore');
+            review_text = PrettifyStr(html.tostring(review_text_elem, encoding='UTF-8').decode('utf-8', 'ignore'));
             
-            FieldsStr = review_name_date[0] + ', ' +  review_text + ', ' + review_rating + ', ' + str(1) + ', ' + review_name_date[1]  + ', ' +  review_name_date[1];
-            reviews_file.write((Name + u'\n').encode('utf-8', 'ignore'));
-            reviews_file.write(u'INSERT INTO oc_reviews(review_id, product_id, customer_id, author, text, rating, status, date_added, date_modified) VALUES({0});\n'.format(FieldsStr).encode('utf-8', 'ignore'));    
+            FieldsStr = PrettifyStr(Name) + '^' + PrettifyStr((review_name_date[0])) + '^' +  review_text + '^' + PrettifyStr(review_rating) + '^' + PrettifyStr(str(1)) + '^' + PrettifyStr(review_name_date[1])  + '^' +  PrettifyStr(review_name_date[1]);
+            #reviews_file.write((Name + u'\n').encode('utf-8', 'ignore'));
+            reviews_file.write(u'{0};\n'.format(FieldsStr).encode('utf-8', 'ignore'));    
     finally:
         reviews_file.close();
     
@@ -212,100 +212,7 @@ def ParseItems(linkLines, lock, part):
             if not root.find_class('errortext'):
                 name_str = ParseName(root);
                 print 'Name: ' + name_str;
-                img_str = ParseImages(root).strip();
-                print 'Images links: ' + img_str;
-                if img_str != '':
-                    img_str = savepics(img_str, itemLink);
-                    
-                print 'Images paths:' + img_str;    
-                desc_div = ParseDescElement(root);
-                div_specs = ParseSpecsElements(root);    
-                
-                # основная операция
-                SKU = ParseSKU(div_specs, name_str);
-                
-                group_str = ParseCategory(root);
-                print 'Category: ' + group_str;
-                price = PrettifyStr(ParsePrice(root)); 
-                
-    main_image_div = None;
-    try:
-        main_image_div = root.find_class('photo').pop(); # Забираем основное фото
-    except:
-        pass;
-    if main_image_div is not None:
-        for imageLink in main_image_div.iterlinks():
-            if '/upload/iblock/' in imageLink[2]:
-                res.append(site_url + imageLink[2]);
-            
-    resStr = '^'.join(res); 
-    return resStr;
-
-def ParseName(root):
-    right_col = root.find_class('col-right').pop();
-    return right_col.xpath("//h1[@itemprop='name']/text()")[0]; #/h1[@itemprop='name']/text()"
-
-def ParseDesc(desc_div):
-    res = '';
-    if desc_div is not None:  
-        for child in desc_div.getchildren():
-            res += html.tostring(child, encoding='UTF-8');
-            
-    return res;
-
-def ParseSKU(specs_divs, sku_default):
-    Result = 0;
-    for specs_div in specs_divs:
-        text = specs_div.text_content();
-        name = u'Артикул: ';
-        if name in text:
-            Result = text.replace(name, '');
-            break;                    
-    return Result;
-
-def GetLastLink(part):
-    last_link = '';
-    if os.path.exists(ParsedPart.format(part)):
-        done_file = open(ParsedPart.format(part), 'r+', 0);
-        try:
-            lines = done_file.readlines();
-            if lines.count > 0: 
-                last_link = lines[-1]; 
-        except:
-            pass; 
-        done_file.close();
-    return last_link.strip();
-
-def ParsePrice(root):
-    price_class = root.find_class('price').pop();
-    price_text = price_class.text_content().replace(u' руб', '');
-    return price_text;
-
-def ParseItems(linkLines, lock, part):
-    ResFileExisted = os.path.exists(CSVFilePart.format(part));
-    last_link = GetLastLink(part);
-    res_file = open(CSVFilePart.format(part), 'a+', 0);
-    done_file = open(ParsedPart.format(part), 'a+', 0);
-    try:
-        if not ResFileExisted: 
-            res_file.write('{0}^{1}^{2}^{3}^{4}^{5}^{6}^{7}\n'.format('sku', 'name', 'desc', 'group', 'price', 'img', 'img1', 'img2', 'img3'));
-        for itemLink in linkLines:
-            itemLink = itemLink.strip();
-            if (last_link != '') and (last_link != itemLink):
-                continue;
-            last_link = ''; # Что бы крутилось дальше
-            print 'Opening: ' + site_url + itemLink;
-
-                #page = urlopen(site_url + itemLink, timeout = 10000);
-            request = urllib2.Request(site_url + itemLink);
-            request.add_header('User-Agent', 'Mozilla/5.0 (Windows NT 9.1; rv:10.0) Gecko/20151031 Firefox/40.0'); 
-            opener = urllib2.build_opener();                                   
-            page = opener.open(request).read();
-            root = html.fromstring(page);
-            if not root.find_class('errortext'):
-                name_str = ParseName(root);
-                print 'Name: ' + name_str;
-                img_str = ParseImages(root).strip();
+                '''img_str = ParseImages(root).strip();
                 print 'Images links: ' + img_str;
                 if img_str != '':
                     img_str = savepics(img_str, itemLink);
@@ -320,12 +227,11 @@ def ParseItems(linkLines, lock, part):
                 group_str = ParseCategory(root);
                 print 'Category: ' + group_str;
                 price = str(float(PrettifyStr(ParsePrice(root))) * 5); 
->>>>>>> branch 'master' of https://github.com/Groxecatum/Parsers
                 print 'Price: ' + price;  
-                desc_str = PrettifyStr(ParseDesc(desc_div)).decode('utf-8', 'ignore');
+                desc_str = PrettifyStr(ParseDesc(desc_div)).decode('utf-8', 'ignore');'''
                 ParseAndPlaceReviews(root, part, name_str);
                 #print desc_str;
-                Overall_Str = formatStr.format(SKU, 
+                '''Overall_Str = formatStr.format(SKU, 
                                         name_str, 
                                         desc_str,
                                         group_str,
@@ -334,7 +240,7 @@ def ParseItems(linkLines, lock, part):
                 Overall_Str = Overall_Str.encode('utf-8', 'ignore');
                 res_file.write(Overall_Str);
                                          
-                done_file.write(itemLink + '\n');
+                done_file.write(itemLink + '\n');'''
     finally:
         done_file.close();
         res_file.close();  
